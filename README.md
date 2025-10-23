@@ -1,8 +1,8 @@
 # Tubi Playlist Builder
 
-A beautiful, interactive playlist builder and gallery for Tubi content.
+A beautiful, interactive playlist builder and gallery for **real Tubi content**. Now fully integrated with Tubi's backend API!
 
-## Features
+## 🎬 Features
 
 ### Gallery Page (Home)
 - 📚 Browse all community playlists
@@ -11,27 +11,46 @@ A beautiful, interactive playlist builder and gallery for Tubi content.
 - 👍 Upvote your favorite playlists
 
 ### Playlist Builder (/create)
+- 🎬 **Real Tubi Content** - Search the actual Tubi catalog
+- 🖼️ **Real Cover Art** - Professional posters from Tubi
+- 🔗 **Deep Links** - Click titles to open on Tubi
 - 🎨 Auto-generated cover art based on playlist mood
-- 🔍 Real-time search functionality
 - ✨ AI-powered title suggestions
 - ↕️ Drag and reorder items
 - 📱 Responsive design
 - 🎭 Smooth animations with Framer Motion
 - 💾 Local storage persistence
 
-## Getting Started
+## 🚀 Quick Start (With Tubi Integration)
 
-1. Install dependencies:
+**Option 1: Use the start script (Recommended)**
+
 ```bash
+# This starts both the API server and PlayApp
+./start-with-api.sh
+```
+
+**Option 2: Manual start**
+
+```bash
+# Terminal 1: Start the Tubi API server (chatgpt-app)
+cd /Users/asriram/chatgpt-app
+npm run build
+npm start
+# Server runs on http://localhost:3000
+
+# Terminal 2: Start PlayApp
+cd /Users/asriram/plylist
 npm install
-```
-
-2. Run the development server:
-```bash
 npm run dev
+# App runs on http://localhost:3001
 ```
 
-3. Open [http://localhost:3000](http://localhost:3000) in your browser.
+Then open http://localhost:3001 in your browser.
+
+## 📚 Documentation
+
+- **[TUBI_INTEGRATION.md](./TUBI_INTEGRATION.md)** - Complete integration guide, API reference, and troubleshooting
 
 ## Technology Stack
 
@@ -52,14 +71,26 @@ npm run dev
 5. Upvote playlists you enjoy
 
 ### Playlist Builder (/create)
-1. Search for Tubi titles using the search bar
-2. Click the + button to add titles to your playlist
-3. Reorder items using the arrow buttons
-4. Use the "Suggest" button to generate creative playlist titles
-5. Publish when you have 5-10 titles
-6. Click "Gallery" to return home and view your published playlist
+1. **Search** - Type any query (e.g., "action movies", "comedy series") to search real Tubi content
+2. **Click to View** - Click any title poster or name to open it on Tubi in a new tab
+3. **Add to Playlist** - Click the + button to add titles to your playlist (up to 10)
+4. **Reorder** - Use the arrow buttons to reorder items in your playlist
+5. **Auto-Title** - Use the "Suggest" button to generate creative playlist titles
+6. **Publish** - When you have 5-10 titles, click "Publish" to save your playlist
+7. **View Gallery** - Click "Tubi Playlists" in the header to see all playlists
 
-## Note
+## 🔗 Deep Links
 
-This is a hackathon MVP with mock data. In production, replace the mock catalog with actual Tubi API calls.
+Click any title to open it directly on Tubi:
+- Movies: `https://tubitv.com/movies/{id}`
+- Series: `https://tubitv.com/series/{id}`
+
+## 🎯 Example Searches
+
+Try these searches to get started:
+- "action movies"
+- "horror films"
+- "romantic comedy"
+- "sci-fi series"
+- "documentaries"
 
