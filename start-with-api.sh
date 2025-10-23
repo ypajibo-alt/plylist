@@ -13,8 +13,8 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Check if chatgpt-app directory exists
-if [ ! -d "/Users/asriram/chatgpt-app" ]; then
-    echo "❌ Error: chatgpt-app directory not found at /Users/asriram/chatgpt-app"
+if [ ! -d "/Users/vcheng/Downloads/hackathon/chatgpt-app" ]; then
+    echo "❌ Error: chatgpt-app directory not found at /Users/vcheng/Downloads/hackathon/chatgpt-app"
     exit 1
 fi
 
@@ -25,12 +25,12 @@ if [ ! -f "package.json" ]; then
 fi
 
 echo "${BLUE}📦 Step 1: Building API server...${NC}"
-cd /Users/asriram/chatgpt-app
+cd /Users/vcheng/Downloads/hackathon/chatgpt-app
 npm run build > /dev/null 2>&1
 
 if [ $? -ne 0 ]; then
     echo "❌ Error: Failed to build chatgpt-app"
-    echo "Run 'cd /Users/asriram/chatgpt-app && npm install && npm run build' manually"
+    echo "Run 'cd /Users/vcheng/Downloads/hackathon/chatgpt-app && npm install && npm run build' manually"
     exit 1
 fi
 
@@ -44,7 +44,7 @@ echo "   (Tubi API, automatic token generation)"
 echo ""
 
 # Start chatgpt-app in background
-cd /Users/asriram/chatgpt-app
+cd /Users/vcheng/Downloads/hackathon/chatgpt-app
 npm start > /tmp/chatgpt-app.log 2>&1 &
 API_PID=$!
 
@@ -70,7 +70,7 @@ echo "   (Next.js will auto-select port 3001 if 3000 is taken)"
 echo ""
 
 # Start PlayApp (this will run in foreground)
-cd /Users/asriram/plylist
+cd /Users/vcheng/Downloads/hackathon/plylist
 npm run dev
 
 # If we get here, user pressed Ctrl+C

@@ -131,17 +131,99 @@ function tubiToPlaylistItem(content: TubiContent): PlaylistItem {
 function savePlaylist({ id, title, description, items, coverCss }: any) {
   const key = "tubi_playlists";
   const existing = JSON.parse(localStorage.getItem(key) || "[]");
+  
+  // Generate thumbnails array from first 4 items with thumbnails
+  const thumbnails = items
+    .filter((item: PlaylistItem) => item.thumbnail)
+    .slice(0, 4)
+    .map((item: PlaylistItem) => item.thumbnail);
+  
   const entry = {
     id,
     title,
     description,
     items,
     coverCss,
+    thumbnails,
     votes: 0,
     createdAt: new Date().toISOString(),
   };
   localStorage.setItem(key, JSON.stringify([entry, ...existing]));
   return entry;
+}
+
+// Collage Preview Component for dynamic cover art
+function CollagePreview({ playlist, coverCss }: { playlist: PlaylistItem[]; coverCss: string }) {
+  const maxItems = 4;
+  const itemsWithThumbnails = playlist.filter(item => item.thumbnail).slice(0, maxItems);
+  
+  // If no thumbnails available, show gradient fallback
+  if (itemsWithThumbnails.length === 0) {
+    return (
+      <div className="rounded-2xl aspect-square shadow-xl border border-white/10" style={{ background: coverCss }}>
+        <div className="flex items-center justify-center h-full text-white/50 text-sm font-inter">
+          Add items with covers to generate collage
+        </div>
+      </div>
+    );
+  }
+  
+  // Create grid layout based on number of items
+  const getGridLayout = (count: number) => {
+    if (count === 1) return "grid-cols-1";
+    if (count === 2) return "grid-cols-2";
+    return "grid-cols-2 grid-rows-2";
+  };
+  
+  return (
+    <div className="rounded-2xl aspect-square shadow-xl border border-white/10 overflow-hidden relative">
+      {/* Gradient overlay for brand consistency */}
+      <div 
+        className="absolute inset-0 opacity-20" 
+        style={{ background: coverCss }}
+      />
+      
+      {/* Thumbnail grid */}
+      <div className={`grid ${getGridLayout(itemsWithThumbnails.length)} gap-1 h-full p-1`}>
+        {itemsWithThumbnails.map((item, index) => (
+          <div key={item.id} className="relative overflow-hidden rounded-lg">
+            <img
+              src={item.thumbnail}
+              alt={item.title}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // Fallback to gradient if image fails
+                const target = e.target as HTMLImageElement;
+                const hue = hashStringToHue(item.title);
+                const bg = `linear-gradient(135deg, hsl(${hue} 70% 45%), hsl(${(hue + 40) % 360} 70% 30%))`;
+                target.style.background = bg;
+                target.style.display = 'flex';
+                target.style.alignItems = 'center';
+                target.style.justifyContent = 'center';
+                target.innerText = item.title.charAt(0);
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+          </div>
+        ))}
+        
+        {/* Fill empty slots with gradient if less than 4 items */}
+        {itemsWithThumbnails.length < maxItems && 
+          Array.from({ length: maxItems - itemsWithThumbnails.length }).map((_, index) => (
+            <div 
+              key={`empty-${index}`} 
+              className="relative overflow-hidden rounded-lg opacity-30"
+              style={{ background: coverCss }}
+            >
+              <div className="flex items-center justify-center h-full text-white/50 text-2xl font-bold">
+                +
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  );
 }
 
 function PlaceholderPoster({ title, thumbnail }: { title: string; thumbnail?: string }) {
@@ -393,8 +475,13 @@ export default function PlaylistBuilderPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Cover Preview */}
               <div>
-                <div className="rounded-2xl aspect-[16/10] shadow-xl border border-white/10" style={{ background: coverCss }} />
-                <div className="mt-2 text-xs text-white/70 font-inter">Cover art auto-generated from your playlist vibes.</div>
+                <CollagePreview playlist={playlist} coverCss={coverCss} />
+                <div className="mt-2 text-xs text-white/70 font-inter">
+                  {playlist.filter(item => item.thumbnail).length > 0 
+                    ? "Cover collage generated from your playlist items." 
+                    : "Cover art auto-generated from your playlist vibes."
+                  }
+                </div>
               </div>
               {/* Metadata */}
               <div className="md:col-span-2 space-y-3">
@@ -446,7 +533,14 @@ export default function PlaylistBuilderPage() {
             {playlist.length === 0 && (
               <div className="text-sm text-white/70 font-inter">No titles added yet. Search and press + on any title to add it here.</div>
             )}
-            <motion.div layout className="space-y-2">
+            <motion.div 
+              layout 
+              className="space-y-2 max-h-[320px] overflow-y-auto pr-2 pb-4 playlist-scroll"
+              style={{
+                scrollbarWidth: 'thin',
+                scrollbarColor: 'rgba(255, 255, 255, 0.2) transparent'
+              }}
+            >
               {playlist.map((item, idx) => (
                 <PlaylistItem
                   key={item.id}

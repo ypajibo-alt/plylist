@@ -25,7 +25,13 @@ export default function Header() {
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
             
-            <Link href="/" className="flex-shrink-0">
+            <a 
+              href="https://tubi.tv/" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="flex-shrink-0 hover:opacity-80 transition-opacity"
+              title="Visit Tubi.tv"
+            >
               <Image
                 src="/Tubi_Logo_RGB_Hello_Yellow.webp"
                 alt="Tubi"
@@ -33,7 +39,7 @@ export default function Header() {
                 height={20}
                 className="h-5 w-auto"
               />
-            </Link>
+            </a>
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-6 ml-6">

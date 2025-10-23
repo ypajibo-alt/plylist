@@ -3,7 +3,7 @@
  * Connects to local chatgpt-app REST API for Tubi content
  */
 
-// API base URL - chatgpt-app runs on port 3000
+// API base URL - chatgpt-app runs on port 3000, frontend on 3001
 const API_BASE = process.env.NEXT_PUBLIC_TUBI_API_URL || "http://localhost:3000";
 
 // ============================================================================
