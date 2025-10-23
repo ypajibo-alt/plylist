@@ -158,15 +158,18 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0f0014] via-[#1a0520] to-[#2a0146]">
-      <Header />
-
-      {/* Hero Section */}
-      <section
-        className="relative min-h-[65vh] flex items-center justify-center overflow-hidden px-6"
+      {/* Header + Hero Wrapper with Turple Gradient */}
+      <div 
+        className="relative"
         style={{
-          background: "linear-gradient(to bottom, #2a0146 0%, #2b0058 10%, #8B5CF6 50%, #EC4899 100%)",
+          background: "#45009D", /* Fallback for older browsers */
+          background: "linear-gradient(15deg, #45009D 0%, #8C00E5 100%)",
         }}
       >
+        <Header />
+        
+        {/* Hero Section */}
+        <section className="relative min-h-[65vh] flex items-center justify-center overflow-hidden px-6">
         <div className="absolute inset-0 bg-gradient-to-t from-[#0f0014] via-[#0f0014]/60 to-transparent" />
         <div className="relative z-10 flex w-full max-w-[820px] flex-col items-center text-center gap-6 sm:gap-8 md:gap-10 lg:gap-12">
           <h1 className="m-0 text-5xl md:text-6xl text-white font-tubi-black leading-tight tracking-[-0.01em]">
@@ -178,8 +181,7 @@ const Index = () => {
           <Link href="/create" className="m-0">
             <Button
               size="lg"
-              variant="hero"
-              className="gap-2 text-lg px-8 h-14 shadow-lg transition-all hover:shadow-xl"
+              className="gap-2 text-lg px-8 h-14 shadow-lg transition-all hover:shadow-xl bg-[#FFFF13] hover:bg-[#FFFF13]/85 active:bg-[#FFFF13]/70 text-black font-bold"
             >
               <Plus className="w-5 h-5" />
               Create Playlist
@@ -187,6 +189,7 @@ const Index = () => {
           </Link>
         </div>
       </section>
+      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-12">

@@ -12,7 +12,7 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState("");
 
   return (
-    <nav className="bg-gradient-to-b from-[#0f0014] via-[#1a0520] to-[#2a0146]">
+    <nav className="bg-transparent">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Left section - Menu & Logo */}
