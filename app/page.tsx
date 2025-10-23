@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search, TrendingUp, Clock, ArrowUp } from "lucide-react";
 import PlaylistCard from "@/components/PlaylistCard";
 import Header from "@/components/Header";
+import { getTubiDeepLink } from "@/lib/tubi-api";
 import {
   Dialog,
   DialogContent,
@@ -338,39 +339,51 @@ const Index = () => {
               </DialogHeader>
               
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pt-4">
-                {selectedPlaylist.items?.map((item) => (
-                  <div
-                    key={item.id}
-                    className="group cursor-pointer"
-                  >
-                    <div className="relative overflow-hidden rounded-lg aspect-[2/3] mb-2">
-                      {item.thumbnail ? (
-                        <img
-                          src={item.thumbnail}
-                          alt={item.title}
-                          className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                        />
-                      ) : (
-                        <div 
-                          className="w-full h-full flex items-center justify-center text-white/30 text-4xl font-bold"
-                          style={{
-                            background: `linear-gradient(135deg, ${selectedPlaylist.coverColor}40, ${selectedPlaylist.coverColor}20)`,
-                          }}
-                        >
-                          {item.title.charAt(0)}
-                        </div>
+                {selectedPlaylist.items?.map((item) => {
+                  const handlePosterClick = () => {
+                    // Generate deep link to Tubi content
+                    const deepLink = getTubiDeepLink(item.id, item.type === "series" ? "s" : "v");
+                    window.open(deepLink, "_blank");
+                  };
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="group cursor-pointer"
+                    >
+                      <div 
+                        className="relative overflow-hidden rounded-lg aspect-[2/3] mb-2 cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={handlePosterClick}
+                        title={`Watch ${item.title} on Tubi`}
+                      >
+                        {item.thumbnail ? (
+                          <img
+                            src={item.thumbnail}
+                            alt={item.title}
+                            className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                          />
+                        ) : (
+                          <div 
+                            className="w-full h-full flex items-center justify-center text-white/30 text-4xl font-bold"
+                            style={{
+                              background: `linear-gradient(135deg, ${selectedPlaylist.coverColor}40, ${selectedPlaylist.coverColor}20)`,
+                            }}
+                          >
+                            {item.title.charAt(0)}
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <h4 className="font-semibold text-sm line-clamp-2 text-white font-inter">{item.title}</h4>
+                      {item.year && (
+                        <p className="text-xs text-white/60 font-inter">{item.year}</p>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      {item.genres && item.genres.length > 0 && (
+                        <p className="text-xs text-white/50 font-inter">{item.genres.slice(0, 2).join(", ")}</p>
+                      )}
                     </div>
-                    <h4 className="font-semibold text-sm line-clamp-2 text-white font-inter">{item.title}</h4>
-                    {item.year && (
-                      <p className="text-xs text-white/60 font-inter">{item.year}</p>
-                    )}
-                    {item.genres && item.genres.length > 0 && (
-                      <p className="text-xs text-white/50 font-inter">{item.genres.slice(0, 2).join(", ")}</p>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
