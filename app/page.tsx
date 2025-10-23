@@ -162,7 +162,6 @@ const Index = () => {
       <div 
         className="relative"
         style={{
-          background: "#45009D", /* Fallback for older browsers */
           background: "linear-gradient(15deg, #45009D 0%, #8C00E5 100%)",
         }}
       >

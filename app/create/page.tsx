@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Plus, Search, X, ArrowUp, ArrowDown, Sparkles, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,31 +10,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { v4 as uuidv4 } from "uuid";
 import Link from "next/link";
 import Header from "@/components/Header";
+import { searchTubiContent, TubiContent, getBestThumbnail, getTubiDeepLink } from "@/lib/tubi-api";
 
-// --- Mock Catalog (replace with Tubi API) ---
-// Minimal set; add more items as needed for demo
-const CATALOG = [
-  { id: "t1", title: "Scooby-Doo, Where Are You?", year: 1969, genres: ["Animation", "Family", "Mystery"], mood: "playful" },
-  { id: "t2", title: "Coraline", year: 2009, genres: ["Animation", "Fantasy", "Horror"], mood: "moody" },
-  { id: "t3", title: "The Craft", year: 1996, genres: ["Horror", "Fantasy"], mood: "witchy" },
-  { id: "t4", title: "Autumn in New York", year: 2000, genres: ["Romance", "Drama"], mood: "cozy" },
-  { id: "t5", title: "Home for Harvest", year: 2019, genres: ["Romance"], mood: "cozy" },
-  { id: "t6", title: "Relazing Autumn Leaves", year: 2021, genres: ["Lifestyle"], mood: "calm" },
-  { id: "t7", title: "Bob the Builder", year: 1998, genres: ["Kids", "Animation"], mood: "bright" },
-  { id: "t8", title: "Leaving Soon: Cult Classics", year: 2020, genres: ["Collection", "Cult"], mood: "retro" },
-  { id: "t9", title: "Storm Chasers", year: 2011, genres: ["Reality", "Action"], mood: "intense" },
-  { id: "t10", title: "The Beauty of Love", year: 2016, genres: ["Romance"], mood: "sweet" },
-  { id: "t11", title: "Autumn Road", year: 2020, genres: ["Drama"], mood: "cozy" },
-  { id: "t12", title: "Candles on Bay Street", year: 2006, genres: ["Drama"], mood: "warm" },
-  { id: "t13", title: "Most Popular Horror Mix", year: 2022, genres: ["Horror"], mood: "dark" },
-  { id: "t14", title: "Staff Picks: Feel-Good", year: 2023, genres: ["Comedy", "Drama"], mood: "uplifting" },
-  { id: "t15", title: "Autumn Stables", year: 2018, genres: ["Romance"], mood: "cozy" },
-  { id: "t16", title: "Relaxing White Noise", year: 2023, genres: ["Lifestyle"], mood: "calm" },
-  { id: "t17", title: "Sabrina the Teenage Witch", year: 1996, genres: ["Comedy", "Fantasy"], mood: "nostalgic" },
-  { id: "t18", title: "Secondhand Lions", year: 2003, genres: ["Family", "Adventure"], mood: "heartwarming" },
-  { id: "t19", title: "The Legend Is Real", year: 2024, genres: ["Action", "Adventure"], mood: "epic" },
-  { id: "t20", title: "A Tribute to Diane Keaton", year: 2024, genres: ["Documentary"], mood: "elegant" },
-];
+// Normalized content type for playlist items
+interface PlaylistItem {
+  id: string;
+  title: string;
+  year?: number;
+  genres: string[];
+  mood: string;
+  thumbnail?: string;
+  type: string;
+}
 
 // --- Utilities ---
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
@@ -109,6 +96,37 @@ function suggestTitleFrom(playlist: any[]) {
   return presets[Math.floor(Math.random() * presets.length)];
 }
 
+// Convert Tubi content to playlist item
+function tubiToPlaylistItem(content: TubiContent): PlaylistItem {
+  // Determine mood based on genres
+  const tags = content.tags || [];
+  let mood = "tubi";
+  
+  if (tags.some(t => t.toLowerCase().includes("horror") || t.toLowerCase().includes("thriller"))) {
+    mood = "dark";
+  } else if (tags.some(t => t.toLowerCase().includes("comedy"))) {
+    mood = "uplifting";
+  } else if (tags.some(t => t.toLowerCase().includes("romance"))) {
+    mood = "sweet";
+  } else if (tags.some(t => t.toLowerCase().includes("action"))) {
+    mood = "intense";
+  } else if (tags.some(t => t.toLowerCase().includes("sci-fi") || t.toLowerCase().includes("science fiction"))) {
+    mood = "epic";
+  } else if (tags.some(t => t.toLowerCase().includes("drama"))) {
+    mood = "moody";
+  }
+  
+  return {
+    id: content.id,
+    title: content.title,
+    year: content.year,
+    genres: content.tags || ["Unknown"],
+    mood,
+    thumbnail: getBestThumbnail(content) || undefined,
+    type: content.type === "s" ? "series" : "movie",
+  };
+}
+
 // Save to localStorage for hackathon demo
 function savePlaylist({ id, title, description, items, coverCss }: any) {
   const key = "tubi_playlists";
@@ -126,9 +144,29 @@ function savePlaylist({ id, title, description, items, coverCss }: any) {
   return entry;
 }
 
-function PlaceholderPoster({ title }: { title: string }) {
+function PlaceholderPoster({ title, thumbnail }: { title: string; thumbnail?: string }) {
   const hue = hashStringToHue(title);
   const bg = `linear-gradient(135deg, hsl(${hue} 70% 45%), hsl(${(hue + 40) % 360} 70% 30%))`;
+  
+  // Use real thumbnail if available
+  if (thumbnail) {
+    return (
+      <div className="aspect-[2/3] w-full rounded-xl shadow-md overflow-hidden relative">
+        <img 
+          src={thumbnail} 
+          alt={title}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            // Fallback to gradient if image fails to load
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+      </div>
+    );
+  }
+  
+  // Fallback to gradient
   return (
     <div className="aspect-[2/3] w-full rounded-xl shadow-md overflow-hidden" style={{ background: bg }}>
       <div className="p-2 text-white/90 text-xs font-semibold line-clamp-3 font-inter">{title}</div>
@@ -137,20 +175,35 @@ function PlaceholderPoster({ title }: { title: string }) {
 }
 
 function ResultTile({ item, onAdd, disabled }: any) {
+  const handlePosterClick = () => {
+    // Open Tubi content in new tab
+    const deepLink = getTubiDeepLink(item.id, item.type === "series" ? "s" : "v");
+    window.open(deepLink, "_blank");
+  };
+
   return (
     <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="group">
       <Card className="border-0 bg-transparent">
         <CardContent className="p-2">
-          <PlaceholderPoster title={item.title} />
+          <div onClick={handlePosterClick} className="cursor-pointer hover:opacity-80 transition-opacity">
+            <PlaceholderPoster title={item.title} thumbnail={item.thumbnail} />
+          </div>
           <div className="mt-2 flex items-center justify-between gap-2">
-            <div className="text-sm font-bold truncate font-tubi text-white" title={item.title}>
+            <div 
+              className="text-sm font-bold truncate font-tubi text-white hover:text-purple-300 cursor-pointer transition-colors" 
+              title={item.title}
+              onClick={handlePosterClick}
+            >
               {item.title}
             </div>
             <Button size="icon" variant="secondary" className="shrink-0" disabled={disabled} onClick={() => onAdd(item)}>
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          <div className="text-xs text-muted-foreground truncate font-inter">{item.genres.join(", ")}</div>
+          <div className="text-xs text-muted-foreground truncate font-inter">
+            {item.year && `${item.year} • `}
+            {item.genres.slice(0, 2).join(", ")}
+          </div>
         </CardContent>
       </Card>
     </motion.div>
@@ -158,14 +211,28 @@ function ResultTile({ item, onAdd, disabled }: any) {
 }
 
 function PlaylistItem({ item, index, onRemove, onMoveUp, onMoveDown }: any) {
+  const handleClick = () => {
+    // Open Tubi content in new tab
+    const deepLink = getTubiDeepLink(item.id, item.type === "series" ? "s" : "v");
+    window.open(deepLink, "_blank");
+  };
+
   return (
     <motion.div layout className="flex items-center gap-3 p-2 rounded-xl bg-white/5 border border-white/10">
-      <div className="w-12">
-        <PlaceholderPoster title={item.title} />
+      <div className="w-12 cursor-pointer hover:opacity-80 transition-opacity" onClick={handleClick}>
+        <PlaceholderPoster title={item.title} thumbnail={item.thumbnail} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-bold truncate font-tubi text-white">{item.title}</div>
-        <div className="text-xs text-muted-foreground truncate font-inter">{item.genres.join(" • ")}</div>
+        <div 
+          className="text-sm font-bold truncate font-tubi text-white hover:text-purple-300 cursor-pointer transition-colors"
+          onClick={handleClick}
+        >
+          {item.title}
+        </div>
+        <div className="text-xs text-muted-foreground truncate font-inter">
+          {item.year && `${item.year} • `}
+          {item.genres.slice(0, 2).join(" • ")}
+        </div>
       </div>
       <div className="flex items-center gap-1">
         <Button size="icon" variant="ghost" onClick={() => onMoveUp(index)}>
@@ -184,21 +251,77 @@ function PlaylistItem({ item, index, onRemove, onMoveUp, onMoveDown }: any) {
 
 export default function PlaylistBuilderPage() {
   const [query, setQuery] = useState("");
-  const [playlist, setPlaylist] = useState<any[]>([]);
+  const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [coverCss, setCoverCss] = useState(computeCoverGradient([]));
   const [publishedId, setPublishedId] = useState<string | null>(null);
+  const [results, setResults] = useState<PlaylistItem[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(false);
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return CATALOG;
-    return CATALOG.filter((it) =>
-      [it.title, ...(it.genres || [])]
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
-    );
+  // Load initial popular content on mount
+  useEffect(() => {
+    const loadInitialContent = async () => {
+      if (initialLoaded) return;
+      
+      console.log("🎬 Loading initial popular content...");
+      setIsSearching(true);
+      
+      // Search for popular/trending content by default
+      const response = await searchTubiContent("popular movies", 30);
+      
+      if (response && response.contents.length > 0) {
+        const items = response.contents.map(tubiToPlaylistItem);
+        setResults(items);
+        console.log(`✅ Loaded ${items.length} initial items`);
+      } else {
+        console.warn("⚠️ Failed to load initial content");
+        setResults([]);
+      }
+      
+      setIsSearching(false);
+      setInitialLoaded(true);
+    };
+
+    loadInitialContent();
+  }, [initialLoaded]);
+
+  // Search Tubi content when query changes (debounced)
+  useEffect(() => {
+    const searchContent = async () => {
+      const q = query.trim();
+      
+      // If empty query, show initial popular content
+      if (!q) {
+        return;
+      }
+
+      console.log(`🔍 Searching for: "${q}"`);
+      setIsSearching(true);
+      
+      const response = await searchTubiContent(q, 50);
+      
+      if (response && response.contents.length > 0) {
+        const items = response.contents.map(tubiToPlaylistItem);
+        setResults(items);
+        console.log(`✅ Found ${items.length} results`);
+      } else {
+        console.warn("⚠️ No results found");
+        setResults([]);
+      }
+      
+      setIsSearching(false);
+    };
+
+    // Debounce search by 500ms
+    const timer = setTimeout(() => {
+      if (query.trim()) {
+        searchContent();
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, [query]);
 
   useEffect(() => {
@@ -342,21 +465,43 @@ export default function PlaylistBuilderPage() {
       {/* Search Results */}
       <div className="mx-auto max-w-7xl px-4 mt-6">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-bold font-tubi text-white">Results</h2>
-          <div className="text-sm text-white/70 font-inter">{results.length} titles</div>
+          <h2 className="text-lg font-bold font-tubi text-white">
+            {query.trim() ? `Search Results` : `Popular Content`}
+          </h2>
+          <div className="text-sm text-white/70 font-inter">
+            {isSearching ? "Searching..." : `${results.length} titles`}
+          </div>
         </div>
-        <motion.div layout className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {results.map((item) => (
-            <ResultTile key={item.id} item={item} onAdd={onAdd} disabled={playlist.some((p) => p.id === item.id) || playlist.length >= 10} />
-          ))}
-        </motion.div>
+        
+        {isSearching && (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            <p className="text-white/70 mt-4 font-inter">Searching Tubi catalog...</p>
+          </div>
+        )}
+        
+        {!isSearching && results.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-white/70 font-inter">
+              {query.trim() ? "No results found. Try a different search." : "Loading content..."}
+            </p>
+          </div>
+        )}
+        
+        {!isSearching && results.length > 0 && (
+          <motion.div layout className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {results.map((item) => (
+              <ResultTile key={item.id} item={item} onAdd={onAdd} disabled={playlist.some((p) => p.id === item.id) || playlist.length >= 10} />
+            ))}
+          </motion.div>
+        )}
         <div className="h-16" />
       </div>
 
       {/* Footer */}
       <div className="border-t border-white/10 mt-6">
         <div className="mx-auto max-w-7xl px-4 py-8 text-xs text-white/60 font-inter">
-          * Hackathon MVP — Mock data only. Replace catalog + storage with Tubi APIs.
+          🎬 Powered by Tubi • Real content from the Tubi catalog
         </div>
       </div>
     </div>
