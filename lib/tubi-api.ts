@@ -285,3 +285,41 @@ export function getContentRating(content: TubiContent): string {
   return content.ratings[0].code || content.ratings[0].value || "";
 }
 
+/**
+ * Get featured content from Tubi's Featured container
+ * @param limit - Maximum number of items to return (default: 30)
+ */
+export async function getFeaturedContent(
+  limit: number = 30
+): Promise<SearchResponse | null> {
+  try {
+    console.log(`⭐ Getting Featured container content (limit: ${limit})`);
+
+    // Get the featured container contents
+    const response = await getContainerContents("featured", limit);
+    
+    if (!response || !response.contents) {
+      console.error("❌ Failed to get featured container contents");
+      return null;
+    }
+
+    // Normalize contents to array format
+    let contentsArray: TubiContent[] = [];
+    if (Array.isArray(response.contents)) {
+      contentsArray = response.contents;
+    } else {
+      contentsArray = Object.values(response.contents);
+    }
+
+    console.log(`✅ Got ${contentsArray.length} featured items`);
+    
+    return {
+      contents: contentsArray,
+      total: contentsArray.length,
+    };
+  } catch (error) {
+    console.error("❌ Featured content error:", error);
+    return null;
+  }
+}
+

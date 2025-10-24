@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { searchTubiContent, TubiContent, getBestThumbnail, getTubiDeepLink } from "@/lib/tubi-api";
+import { searchTubiContent, getFeaturedContent, TubiContent, getBestThumbnail, getTubiDeepLink } from "@/lib/tubi-api";
 
 // Normalized content type for playlist items
 interface PlaylistItem {
@@ -380,25 +380,34 @@ export default function PlaylistBuilderPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [editMode, setEditMode] = useState<string | null>(null);
   const [originalVotes, setOriginalVotes] = useState(0);
+  const [contentType, setContentType] = useState<"featured" | "suggestions">("featured");
 
-  // Load initial popular content on mount
+  // Load initial featured content on mount
   useEffect(() => {
     const loadInitialContent = async () => {
       if (initialLoaded) return;
       
-      console.log("🎬 Loading initial popular content...");
+      console.log("⭐ Loading Featured container content...");
       setIsSearching(true);
       
-      // Search for popular/trending content by default
-      const response = await searchTubiContent("popular movies", 30);
+      // Get content from Tubi's Featured container
+      const response = await getFeaturedContent(30);
       
       if (response && response.contents.length > 0) {
         const items = response.contents.map(tubiToPlaylistItem);
         setResults(items);
-        console.log(`✅ Loaded ${items.length} initial items`);
+        console.log(`✅ Loaded ${items.length} featured items`);
       } else {
-        console.warn("⚠️ Failed to load initial content");
-        setResults([]);
+        console.warn("⚠️ Failed to load featured content, falling back to search");
+        // Fallback to search if featured container fails
+        const fallbackResponse = await searchTubiContent("popular movies", 30);
+        if (fallbackResponse && fallbackResponse.contents.length > 0) {
+          const items = fallbackResponse.contents.map(tubiToPlaylistItem);
+          setResults(items);
+          console.log(`✅ Loaded ${items.length} fallback items`);
+        } else {
+          setResults([]);
+        }
       }
       
       setIsSearching(false);
@@ -449,11 +458,41 @@ export default function PlaylistBuilderPage() {
     setCoverCss(computeCoverGradient(playlist));
   }, [playlist]);
 
+  // Load featured content function
+  const handleLoadFeatured = async () => {
+    console.log("⭐ Loading Featured container content...");
+    setIsSearching(true);
+    setContentType("featured");
+    
+    // Get content from Tubi's Featured container
+    const response = await getFeaturedContent(30);
+    
+    if (response && response.contents.length > 0) {
+      const items = response.contents.map(tubiToPlaylistItem);
+      setResults(items);
+      console.log(`✅ Loaded ${items.length} featured items`);
+    } else {
+      console.warn("⚠️ Failed to load featured content, falling back to search");
+      // Fallback to search if featured container fails
+      const fallbackResponse = await searchTubiContent("popular movies", 30);
+      if (fallbackResponse && fallbackResponse.contents.length > 0) {
+        const items = fallbackResponse.contents.map(tubiToPlaylistItem);
+        setResults(items);
+        console.log(`✅ Loaded ${items.length} fallback items`);
+      } else {
+        setResults([]);
+      }
+    }
+    
+    setIsSearching(false);
+  };
+
   // ChatGPT-powered intelligent shuffle function
   const handleShuffle = async () => {
     const timestamp = Date.now();
     console.log(`🔀 Starting fresh ChatGPT-powered shuffle [${timestamp}]...`);
     setIsShuffling(true);
+    setContentType("suggestions");
     
     // Clear existing results immediately to show it's working
     setResults([]);
@@ -785,7 +824,7 @@ export default function PlaylistBuilderPage() {
       <div className="mx-auto max-w-7xl px-4 mt-6">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-lg font-bold font-tubi text-white">
-            {query.trim() ? `Search Results` : `Popular Content`}
+            {query.trim() ? `Search Results` : contentType === "featured" ? `Featured Content` : `Suggestions`}
           </h2>
           <div className="flex items-center gap-3">
             <div className="text-sm text-white/70 font-inter">
@@ -794,13 +833,24 @@ export default function PlaylistBuilderPage() {
             <Button
               size="sm"
               variant="ghost"
+              onClick={handleLoadFeatured}
+              disabled={isSearching || isShuffling}
+              className="text-yellow-300 hover:text-yellow-200 hover:bg-yellow-500/20 transition-colors gap-1"
+              title="Load curated content from Tubi's Featured collection"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Featured</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
               onClick={handleShuffle}
               disabled={isSearching || isShuffling}
               className="text-purple-300 hover:text-purple-200 hover:bg-purple-500/20 transition-colors gap-1"
-              title={playlist.length > 0 ? `🤖 ChatGPT analyzes your playlist to suggest 10 similar titles + 20 diverse popular recommendations` : `🤖 Get 30 ChatGPT-curated popular titles to start exploring`}
+              title={playlist.length > 0 ? `AI analyzes your playlist to suggest similar titles + diverse recommendations` : `Get AI-curated recommendations to start exploring`}
             >
               <Shuffle className="h-4 w-4" />
-              <span className="hidden sm:inline">🤖 Smart Shuffle</span>
+              <span className="hidden sm:inline">Shuffle</span>
             </Button>
           </div>
         </div>
@@ -812,7 +862,9 @@ export default function PlaylistBuilderPage() {
               {isShuffling ? (
                 playlist.length > 0 
                   ? "🤖 Analyzing your playlist for smart recommendations..." 
-                  : "🤖 Getting fresh curated recommendations..."
+                  : "🤖 Getting AI-curated recommendations..."
+              ) : contentType === "featured" ? (
+                "⭐ Loading Featured content..."
               ) : (
                 "Searching Tubi catalog..."
               )}
@@ -841,7 +893,7 @@ export default function PlaylistBuilderPage() {
       {/* Footer */}
       <div className="border-t border-white/10 mt-6">
         <div className="mx-auto max-w-7xl px-4 py-8 text-xs text-white/60 font-inter">
-          🎬 Powered by Tubi • Real content from the Tubi catalog
+          ⭐ Powered by Tubi • Featuring real content from Tubi's Featured collection
         </div>
       </div>
 
