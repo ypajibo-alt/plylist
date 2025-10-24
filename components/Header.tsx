@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { Search, Menu, X, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const pathname = usePathname();
 
   return (
     <nav className="bg-transparent">
@@ -19,7 +21,7 @@ export default function Header() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="text-white hover:text-[#FFD302] transition-colors"
+              className="text-white hover:text-[#FFFF13] transition-colors"
               aria-label="Menu"
             >
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -43,10 +45,24 @@ export default function Header() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-6 ml-6">
-              <Link href="/create" className="text-white hover:text-[#FFD302] transition-colors font-tubi text-sm">
+              <Link 
+                href="/create" 
+                className={`transition-colors font-tubi text-sm ${
+                  pathname === '/create' 
+                    ? 'text-[#FFFF13]' 
+                    : 'text-white hover:text-[#FFFF13]'
+                }`}
+              >
                 Playlists
               </Link>
-              <Link href="/" className="text-white hover:text-[#FFD302] transition-colors font-tubi text-sm">
+              <Link 
+                href="/" 
+                className={`transition-colors font-tubi text-sm ${
+                  pathname === '/' 
+                    ? 'text-[#FFFF13]' 
+                    : 'text-white hover:text-[#FFFF13]'
+                }`}
+              >
                 Gallery
               </Link>
             </div>
@@ -69,14 +85,14 @@ export default function Header() {
             </div>
 
             {/* Help Icon */}
-            <button className="text-white hover:text-[#FFD302] transition-colors hidden md:block" aria-label="Help">
+            <button className="text-white hover:text-[#FFFF13] transition-colors hidden md:block" aria-label="Help">
               <HelpCircle size={20} />
             </button>
 
             {/* Sign In / Register */}
             <div className="hidden md:flex items-center gap-2">
               <Link href="/login">
-                <Button variant="ghost" className="text-white hover:text-[#FFD302] hover:bg-white/10 font-tubi">
+                <Button variant="ghost" className="text-white hover:text-[#FFFF13] hover:bg-white/10 font-tubi">
                   Sign In
                 </Button>
               </Link>
@@ -100,21 +116,29 @@ export default function Header() {
             <div className="flex flex-col gap-3">
               <Link
                 href="/create"
-                className="text-white hover:text-[#FFD302] transition-colors font-tubi py-2"
+                className={`transition-colors font-tubi py-2 ${
+                  pathname === '/create' 
+                    ? 'text-[#FFFF13]' 
+                    : 'text-white hover:text-[#FFFF13]'
+                }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 Playlists
               </Link>
               <Link
                 href="/"
-                className="text-white hover:text-[#FFD302] transition-colors font-tubi py-2"
+                className={`transition-colors font-tubi py-2 ${
+                  pathname === '/' 
+                    ? 'text-[#FFFF13]' 
+                    : 'text-white hover:text-[#FFFF13]'
+                }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 Gallery
               </Link>
               <div className="pt-3 flex flex-col gap-2">
                 <Link href="/login" onClick={() => setIsMenuOpen(false)}>
-                  <Button variant="ghost" className="w-full text-white hover:text-[#FFD302] hover:bg-white/10 font-tubi">
+                  <Button variant="ghost" className="w-full text-white hover:text-[#FFFF13] hover:bg-white/10 font-tubi">
                     Sign In
                   </Button>
                 </Link>

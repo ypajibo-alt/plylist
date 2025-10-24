@@ -70,6 +70,11 @@ function moodToPalette(mood: string): [number, number] {
 }
 
 function computeCoverGradient(playlist: any[]) {
+  // Use custom radial gradient for empty playlists
+  if (playlist.length === 0) {
+    return "radial-gradient(circle at top left, #FEDCDC, #FEB2B4, #FCE16D)";
+  }
+  
   // Derive palette from dominant mood across items
   const moodCounts: Record<string, number> = {};
   playlist.forEach((it) => {
@@ -180,7 +185,7 @@ function CollagePreview({ playlist, coverCss }: { playlist: PlaylistItem[]; cove
   if (itemsWithThumbnails.length === 0) {
     return (
       <div className="rounded-2xl aspect-square shadow-xl border border-white/10" style={{ background: coverCss }}>
-        <div className="flex items-center justify-center h-full text-white/50 text-sm font-inter">
+        <div className="flex items-center justify-center h-full text-sm font-inter px-4 text-center" style={{ color: '#4B006E' }}>
           Add items with covers to generate collage
         </div>
       </div>
@@ -720,19 +725,20 @@ export default function PlaylistBuilderPage() {
       <Header />
       
       {/* Search Bar */}
-      <div className="mx-auto max-w-7xl px-4 py-4 flex items-center gap-4">
-        <div className="flex-1 max-w-2xl">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search Tubi titles…"
-              className="pl-9 bg-white/10 border-white/10 text-white placeholder:text-white/60"
-            />
+      <div className="mx-auto max-w-7xl px-4 py-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="col-span-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search Tubi titles…"
+                className="pl-9 bg-white/10 border-white/10 text-white placeholder:text-white/60 w-full"
+              />
+            </div>
           </div>
         </div>
-        <Button variant="secondary" onClick={() => setPlaylist([])}>Reset</Button>
       </div>
 
       {/* Hero / Cover Composer */}

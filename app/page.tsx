@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { motion, useMotionValue, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, TrendingUp, Clock, ArrowUp, Edit2, Trash2, Share2, Check } from "lucide-react";
@@ -413,6 +414,13 @@ const Index = () => {
   const [shareSuccess, setShareSuccess] = useState(false);
   const [isLoadingPlaylists, setIsLoadingPlaylists] = useState(true);
 
+  // Interactive hero motion values  
+  const [isHovering, setIsHovering] = useState(false);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const rotateX = useTransform(y, [-200, 0, 200], [12, 0, -12]);
+  const rotateY = useTransform(x, [-200, 0, 200], [-12, 0, 12]);
+
   // Load playlists from localStorage and generate mock playlists with real Tubi content
   useEffect(() => {
     const loadPlaylistsWithRealContent = async () => {
@@ -617,27 +625,62 @@ const Index = () => {
       >
         <Header />
         
-        {/* Hero Section */}
+        {/* Interactive Hero Section */}
         <section className="relative min-h-[65vh] flex items-center justify-center overflow-hidden px-6">
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0f0014] via-[#0f0014]/60 to-transparent" />
-        <div className="relative z-10 flex w-full max-w-[820px] flex-col items-center text-center gap-6 sm:gap-8 md:gap-10 lg:gap-12">
-          <h1 className="m-0 text-5xl md:text-6xl text-white font-tubi-black leading-tight tracking-[-0.01em]">
-            Tubi <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Playlists</span>
-          </h1>
-          <p className="m-0 text-xl text-white/80 font-inter leading-relaxed">
-            Create and share curated playlists of your favorite Tubi content
-          </p>
-          <Link href="/create" className="m-0">
-            <Button
-              size="lg"
-              className="gap-2 text-lg px-8 h-14 shadow-lg transition-all hover:shadow-xl bg-[#FFFF13] hover:bg-[#FFFF13]/85 active:bg-[#FFFF13]/70 text-black font-bold"
+          {/* Interactive Glow Cursor */}
+          <motion.div
+            className="pointer-events-none absolute h-64 w-64 rounded-full bg-gradient-to-r from-[#ff7de9] to-[#fff176] opacity-20 blur-3xl"
+            style={{ x: x, y: y }}
+          />
+          
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0f0014] via-[#0f0014]/60 to-transparent" />
+          
+          {/* Hero Title Section */}
+          <motion.div
+            className="relative z-10 flex w-full max-w-[820px] flex-col items-center text-center gap-4 sm:gap-5 md:gap-6"
+            onMouseMove={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              x.set(e.clientX - rect.left - rect.width / 2);
+              y.set(e.clientY - rect.top - rect.height / 2);
+            }}
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
+            style={{ rotateX: isHovering ? rotateX : 0, rotateY: isHovering ? rotateY : 0 }}
+          >
+            <motion.h1
+              className="m-0 text-6xl md:text-7xl lg:text-8xl text-white font-tubi-black leading-tight tracking-[-0.01em]"
+              animate={{ scale: isHovering ? 1.05 : 1 }}
+              transition={{ type: 'spring', stiffness: 150, damping: 10 }}
             >
-              <Plus className="w-5 h-5" />
-              Create Playlist
-            </Button>
-          </Link>
-        </div>
-      </section>
+              Tubi{" "}
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#FFEAA2] via-[#FEB2B4] to-[#FCE16D]">
+                Playlists
+              </span>
+            </motion.h1>
+            
+            <motion.p
+              className="m-0 text-xl text-white/80 font-inter leading-relaxed"
+              animate={{ opacity: isHovering ? 1 : 0.8 }}
+            >
+              Create and share curated playlists of your favorite Tubi content
+            </motion.p>
+            
+            <Link href="/create" className="m-0">
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Button
+                  size="lg"
+                  className="gap-2 text-lg px-8 h-14 shadow-lg transition-all hover:shadow-xl bg-[#FFFF13] hover:bg-[#FFFF13]/85 active:bg-[#FFFF13]/70 text-black font-bold"
+                >
+                  <Plus className="w-5 h-5" />
+                  Create Playlist
+                </Button>
+              </motion.div>
+            </Link>
+          </motion.div>
+        </section>
       </div>
 
       {/* Main Content */}
