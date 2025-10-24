@@ -39,71 +39,277 @@ interface Playlist {
   coverCss?: string;
 }
 
-// Function to generate mock playlists with real Tubi content
+// Dynamic playlist title generation system
+interface TitleGenerationData {
+  genres: string[];
+  titles: string[];
+  themes: string[];
+  tone: string;
+  searchTerm: string;
+}
+
+function generateContextualTitle(data: TitleGenerationData): string {
+  const { genres, titles, themes, tone, searchTerm } = data;
+  
+  // Extract dominant genre and themes
+  const dominantGenre = genres[0] || searchTerm;
+  const seedTitle = titles[0];
+  const timeOfDay = getTimeOfDay();
+  
+  // Genre-specific base phrases
+  const genreBasePhrases: Record<string, string[]> = {
+    action: ["Adrenaline Rush", "High-Octane", "Action Packed", "Thrill Seekers", "Combat Zone"],
+    adventure: ["Epic Quests", "Wild Journeys", "Adventure Awaits", "Uncharted Territory", "Explorer's Choice"],
+    comedy: ["Laugh Factory", "Comedy Gold", "Humor Central", "Giggle Fest", "Smile Sessions"],
+    drama: ["Emotional Journeys", "Heart & Soul", "Drama Deep Dive", "Powerful Stories", "Life Lessons"],
+    horror: ["Nightmare Fuel", "Spine Chillers", "Fear Factor", "Dark Corners", "Midnight Screams"],
+    thriller: ["Edge of Your Seat", "Pulse Pounders", "Suspense Central", "Tension Zone", "Mind Games"],
+    "sci-fi": ["Future Shock", "Cosmic Adventures", "Tech Noir", "Space Odyssey", "Tomorrow's Tales"],
+    fantasy: ["Magical Realms", "Enchanted Journeys", "Mythic Adventures", "Wonder Worlds", "Fantasy Escapes"],
+    romance: ["Love Stories", "Heart Flutters", "Romantic Escapes", "Passion Play", "Love Lines"],
+    documentary: ["Real Talk", "Truth Unveiled", "Documentary Deep Dive", "Fact Check", "Reality Bites"],
+    biography: ["Life Stories", "True Legends", "Human Interest", "biographical", "Real Heroes"],
+    crime: ["Crime & Chaos", "Law & Disorder", "Criminal Minds", "Street Justice", "Underworld Tales"],
+    mystery: ["Whodunit", "Mystery Box", "Puzzle Pieces", "Detective Stories", "Hidden Truths"],
+    western: ["Wild West", "Frontier Tales", "Cowboy Chronicles", "Desert Showdowns", "Outlaw Stories"],
+  };
+
+  // Title pattern templates
+  const titlePatterns = [
+    // Genre-based patterns
+    () => {
+      const basePhrase = getRandomFromArray(genreBasePhrases[dominantGenre.toLowerCase()] || ["Mixed Bag"]);
+      const modifiers = ["Collection", "Essentials", "Favorites", "Mix", "Selection", "Showcase", "Chronicles"];
+      return `${basePhrase} ${getRandomFromArray(modifiers)}`;
+    },
+    
+    // Time-based patterns
+    () => {
+      const timePhrases = ["Late-Night", "Weekend", "Sunday", "Midnight", "Evening", "Prime Time"];
+      const endings = ["Watchlist", "Binge", "Marathon", "Sessions", "Vibes", "Energy"];
+      return `${getRandomFromArray(timePhrases)} ${dominantGenre} ${getRandomFromArray(endings)}`;
+    },
+    
+    // Mood-based patterns
+    () => {
+      const moodWords = ["Epic", "Intense", "Chill", "Wild", "Smooth", "Raw", "Pure", "Ultimate"];
+      const connectors = ["Escapes", "Adventures", "Journeys", "Experiences", "Chronicles", "Tales"];
+      return `${getRandomFromArray(moodWords)} ${dominantGenre} ${getRandomFromArray(connectors)}`;
+    },
+    
+    // Recommendation-style patterns
+    () => {
+      if (seedTitle && seedTitle.length < 25) {
+        const starters = ["If You Liked", "Fans of", "More Like", "Similar to"];
+        return `${getRandomFromArray(starters)} ${seedTitle}`;
+      }
+      return `Hidden ${dominantGenre} Gems`;
+    },
+    
+    // Energy/vibe patterns
+    () => {
+      const energyWords = ["High Energy", "Smooth Vibes", "Intense", "Chill", "Raw", "Pure"];
+      const formats = ["${energy} ${genre}", "${genre} ${energy}", "Powered by ${energy}"];
+      const format = getRandomFromArray(formats);
+      const energy = getRandomFromArray(energyWords);
+      return format.replace("${energy}", energy).replace("${genre}", dominantGenre);
+    },
+    
+    // Thematic patterns
+    () => {
+      const themes = ["Best of", "Ultimate", "Essential", "Premier", "Top-Tier", "Premium"];
+      const year = new Date().getFullYear();
+      return `${getRandomFromArray(themes)} ${dominantGenre} ${Math.random() > 0.5 ? year : "Collection"}`;
+    },
+    
+    // Creative combinations
+    () => {
+      const adjectives = ["Midnight", "Underground", "Premium", "Exclusive", "Curated", "Elite"];
+      const nouns = ["Selection", "Vault", "Archive", "Collection", "Library", "Anthology"];
+      return `${getRandomFromArray(adjectives)} ${dominantGenre} ${getRandomFromArray(nouns)}`;
+    }
+  ];
+
+  // Select a random pattern and generate title
+  const selectedPattern = getRandomFromArray(titlePatterns);
+  return selectedPattern();
+}
+
+function getTimeOfDay(): string {
+  const hour = new Date().getHours();
+  if (hour >= 0 && hour < 6) return "Late-Night";
+  if (hour >= 6 && hour < 12) return "Morning";
+  if (hour >= 12 && hour < 17) return "Afternoon";
+  if (hour >= 17 && hour < 22) return "Evening";
+  return "Night";
+}
+
+function getRandomFromArray<T>(array: T[]): T {
+  return array[Math.floor(Math.random() * array.length)];
+}
+
+function analyzePlaylistContent(items: PlaylistItem[], searchTerm: string): TitleGenerationData {
+  // Extract and count genres
+  const allGenres = items.flatMap(item => item.genres || []);
+  const genreCount = allGenres.reduce((acc, genre) => {
+    acc[genre] = (acc[genre] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  // Sort genres by frequency
+  const sortedGenres = Object.entries(genreCount)
+    .sort(([,a], [,b]) => b - a)
+    .map(([genre]) => genre);
+
+  // Extract titles and themes
+  const titles = items.map(item => item.title);
+  const themes = [...new Set(allGenres)]; // Unique themes
+  
+  // Determine tone based on dominant genres
+  const dominantGenre = sortedGenres[0]?.toLowerCase() || searchTerm.toLowerCase();
+  let tone = "neutral";
+  
+  if (["action", "thriller", "horror"].includes(dominantGenre)) tone = "intense";
+  else if (["comedy", "romance"].includes(dominantGenre)) tone = "light";
+  else if (["drama", "biography", "documentary"].includes(dominantGenre)) tone = "serious";
+  else if (["sci-fi", "fantasy", "adventure"].includes(dominantGenre)) tone = "adventurous";
+
+  return {
+    genres: sortedGenres,
+    titles,
+    themes,
+    tone,
+    searchTerm
+  };
+}
+
+function generateCreatorName(genres: string[], tone: string): string {
+  const creatorStyles = {
+    intense: ["ActionJunkie", "ThrillSeeker", "AdrenalFan", "EdgeMaster", "IntenseCinema"],
+    light: ["ChillVibes", "FunTimes", "HappyWatcher", "GoodMoods", "SmileMaker"],
+    serious: ["DeepThoughts", "ArtCinema", "StoryLover", "DramaQueen", "RealTalk"],
+    adventurous: ["Explorer", "QuestSeeker", "WonderFan", "EpicTales", "CosmicVibes"],
+    neutral: ["CinemaLover", "MovieBuff", "FilmFan", "ScreenTime", "ReelTalk"]
+  };
+  
+  const styleArray = creatorStyles[tone as keyof typeof creatorStyles] || creatorStyles.neutral;
+  return getRandomFromArray(styleArray) + Math.floor(Math.random() * 999);
+}
+
+function generateContextualDescription(data: TitleGenerationData, title: string): string {
+  const { genres, tone, titles } = data;
+  const dominantGenre = genres[0] || "movies";
+  
+  // Description templates based on tone and content
+  const descriptionTemplates = {
+    intense: [
+      `Heart-pounding ${dominantGenre} that will keep you on the edge of your seat.`,
+      `Adrenaline-fueled ${dominantGenre} for thrill seekers who crave excitement.`,
+      `High-octane ${dominantGenre} that deliver non-stop action and suspense.`,
+      `Pulse-pounding collection of ${dominantGenre} guaranteed to get your blood racing.`
+    ],
+    light: [
+      `Feel-good ${dominantGenre} perfect for brightening your day.`,
+      `Uplifting ${dominantGenre} that bring joy and laughter to any evening.`,
+      `Heartwarming ${dominantGenre} designed to put a smile on your face.`,
+      `Delightful ${dominantGenre} for when you need a mood boost.`
+    ],
+    serious: [
+      `Thought-provoking ${dominantGenre} that explore the depths of human experience.`,
+      `Powerful ${dominantGenre} featuring unforgettable performances and compelling stories.`,
+      `Critically acclaimed ${dominantGenre} that challenge and inspire.`,
+      `Award-worthy ${dominantGenre} that tackle important themes with depth and nuance.`
+    ],
+    adventurous: [
+      `Epic ${dominantGenre} that transport you to incredible worlds and experiences.`,
+      `Mind-bending ${dominantGenre} full of wonder, mystery, and imagination.`,
+      `Spectacular ${dominantGenre} featuring breathtaking journeys and discoveries.`,
+      `Captivating ${dominantGenre} that push the boundaries of possibility.`
+    ],
+    neutral: [
+      `Carefully curated ${dominantGenre} showcasing diverse storytelling.`,
+      `Essential ${dominantGenre} that represent the best of their genre.`,
+      `Handpicked ${dominantGenre} offering something for every viewer.`,
+      `Premium collection of ${dominantGenre} worth your time.`
+    ]
+  };
+
+  const templates = descriptionTemplates[tone as keyof typeof descriptionTemplates] || descriptionTemplates.neutral;
+  let description = getRandomFromArray(templates);
+  
+  // Add contextual elements occasionally
+  if (Math.random() > 0.7 && titles.length > 0) {
+    const featuredTitle = titles[0];
+    if (featuredTitle.length < 30) {
+      description += ` Featuring standouts like "${featuredTitle}" and more hidden gems.`;
+    }
+  }
+  
+  // Add time-based context occasionally
+  if (Math.random() > 0.8) {
+    const timeContexts = [
+      "Perfect for weekend binges.",
+      "Ideal for late-night viewing.",
+      "Great for your next movie marathon.",
+      "Curated for discerning viewers."
+    ];
+    description += ` ${getRandomFromArray(timeContexts)}`;
+  }
+
+  return description;
+}
+
+function generateCoverColor(tone: string, dominantGenre?: string): string {
+  const colorPalettes = {
+    intense: ["#DC2626", "#EF4444", "#B91C1C", "#991B1B"], // Reds
+    light: ["#F59E0B", "#FBBF24", "#10B981", "#059669"], // Yellows/Greens
+    serious: ["#3B82F6", "#1D4ED8", "#6366F1", "#4338CA"], // Blues/Purples
+    adventurous: ["#8B5CF6", "#7C3AED", "#A855F7", "#9333EA"], // Purples
+    neutral: ["#6B7280", "#4B5563", "#374151", "#1F2937"] // Grays
+  };
+
+  // Genre-specific color overrides
+  const genreColors: Record<string, string[]> = {
+    horror: ["#991B1B", "#7F1D1D", "#450A0A"],
+    romance: ["#EC4899", "#DB2777", "#BE185D"],
+    sci_fi: ["#06B6D4", "#0891B2", "#0E7490"],
+    fantasy: ["#8B5CF6", "#7C3AED", "#6D28D9"],
+    comedy: ["#F59E0B", "#D97706", "#B45309"],
+    action: ["#DC2626", "#B91C1C", "#991B1B"],
+    drama: ["#3B82F6", "#2563EB", "#1D4ED8"],
+    thriller: ["#374151", "#1F2937", "#111827"]
+  };
+
+  // Use genre-specific color if available
+  const genreKey = dominantGenre?.toLowerCase().replace('-', '_');
+  if (genreKey && genreColors[genreKey]) {
+    return getRandomFromArray(genreColors[genreKey]);
+  }
+
+  // Fall back to tone-based colors
+  const paletteColors = colorPalettes[tone as keyof typeof colorPalettes] || colorPalettes.neutral;
+  return getRandomFromArray(paletteColors);
+}
+
+// Function to generate mock playlists with real Tubi content and dynamic titles
 async function generateMockPlaylistsWithTubiContent(): Promise<Playlist[]> {
-  const playlistTemplates = [
-    {
-      title: "Action & Adventure Collection",
-      creator: "ActionFan",
-      description: "High-octane thrills and epic adventures that will keep you on the edge of your seat.",
-      coverColor: "#DC2626",
-      searchTerms: ["action", "adventure"],
-      votes: 234,
-      createdAt: new Date("2024-01-15"),
-    },
-    {
-      title: "Comedy Central",
-      creator: "LaughTrack",
-      description: "Hilarious comedies and feel-good movies to brighten your day.",
-      coverColor: "#F59E0B",
-      searchTerms: ["comedy", "funny"],
-      votes: 189,
-      createdAt: new Date("2024-01-20"),
-    },
-    {
-      title: "Drama Masterpieces",
-      creator: "DramaQueen",
-      description: "Powerful stories and unforgettable performances that touch the heart.",
-      coverColor: "#10B981",
-      searchTerms: ["drama", "family"],
-      votes: 156,
-      createdAt: new Date("2024-01-10"),
-    },
-    {
-      title: "Sci-Fi & Fantasy",
-      creator: "MovieBuff2024",
-      description: "Mind-bending sci-fi and magical fantasy adventures from other worlds.",
-      coverColor: "#8B5CF6",
-      searchTerms: ["sci-fi", "fantasy"],
-      votes: 142,
-      createdAt: new Date("2024-01-25"),
-    },
-    {
-      title: "Horror & Thrillers",
-      creator: "ScreamQueen",
-      description: "Spine-chilling horror and edge-of-your-seat thrillers for the brave.",
-      coverColor: "#EF4444",
-      searchTerms: ["horror", "thriller"],
-      votes: 128,
-      createdAt: new Date("2024-01-18"),
-    },
-    {
-      title: "True Stories",
-      creator: "DocumentaryLover",
-      description: "Real stories, documentaries, and biopics that inspire and educate.",
-      coverColor: "#3B82F6",
-      searchTerms: ["documentary", "biography"],
-      votes: 95,
-      createdAt: new Date("2024-01-22"),
-    },
+  const searchQueries = [
+    "action", "comedy", "drama", "horror", "thriller", "sci-fi", 
+    "fantasy", "romance", "documentary", "adventure", "crime", "mystery"
   ];
 
   const mockPlaylists: Playlist[] = [];
+  const targetPlaylistCount = 6; // Generate 6 diverse playlists
+  const usedGenres = new Set<string>(); // Track genres to ensure variety
 
-  for (const template of playlistTemplates) {
+  // Shuffle search queries for randomness
+  const shuffledQueries = [...searchQueries].sort(() => Math.random() - 0.5);
+
+  for (let i = 0; i < targetPlaylistCount && i < shuffledQueries.length; i++) {
+    const searchTerm = shuffledQueries[i];
     try {
-      // Search for content using random search terms
-      const searchTerm = template.searchTerms[Math.floor(Math.random() * template.searchTerms.length)];
+      console.log(`🔍 Generating playlist for: ${searchTerm}`);
+      
       const searchResults = await searchTubiContent(searchTerm, 8);
       
       if (searchResults && searchResults.contents && searchResults.contents.length > 0) {
@@ -117,6 +323,17 @@ async function generateMockPlaylistsWithTubiContent(): Promise<Playlist[]> {
           genres: content.tags?.slice(0, 2) || [],
         }));
 
+        // Analyze content to generate contextual title and description
+        const contentAnalysis = analyzePlaylistContent(items, searchTerm);
+        const dynamicTitle = generateContextualTitle(contentAnalysis);
+        const creator = generateCreatorName(contentAnalysis.genres, contentAnalysis.tone);
+        
+        // Generate description based on content analysis
+        const description = generateContextualDescription(contentAnalysis, dynamicTitle);
+        
+        // Generate cover color based on genre/tone
+        const coverColor = generateCoverColor(contentAnalysis.tone, contentAnalysis.genres[0]);
+
         // Generate thumbnails array for the playlist
         const thumbnails = items
           .filter(item => item.thumbnail)
@@ -125,22 +342,23 @@ async function generateMockPlaylistsWithTubiContent(): Promise<Playlist[]> {
 
         const playlist: Playlist = {
           id: (mockPlaylists.length + 1).toString(),
-          title: template.title,
-          creator: template.creator,
-          description: template.description,
+          title: dynamicTitle,
+          creator: creator,
+          description: description,
           itemCount: items.length,
-          votes: Math.floor(template.votes + Math.random() * 50 - 25), // Add some randomness
-          coverColor: template.coverColor,
+          votes: Math.floor(Math.random() * 300 + 50), // Random votes between 50-350
+          coverColor: coverColor,
           thumbnails,
-          createdAt: template.createdAt,
+          createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000), // Random date within last 30 days
           items,
         };
 
         mockPlaylists.push(playlist);
-        console.log(`🎬 Generated playlist: ${playlist.title} with ${items.length} items`);
+        usedGenres.add(searchTerm);
+        console.log(`🎬 Generated playlist: "${playlist.title}" by ${playlist.creator} with ${items.length} items`);
       }
     } catch (error) {
-      console.error(`Failed to generate playlist for ${template.title}:`, error);
+      console.error(`Failed to generate playlist for ${searchTerm}:`, error);
     }
   }
 

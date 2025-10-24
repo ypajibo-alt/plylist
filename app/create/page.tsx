@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, X, ArrowUp, ArrowDown, Sparkles, Save, Share2, ExternalLink } from "lucide-react";
+import { Plus, Search, X, ArrowUp, ArrowDown, Sparkles, Save, Share2, ExternalLink, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -336,13 +336,28 @@ function PlaylistItem({ item, index, onRemove, onMoveUp, onMoveDown }: any) {
         </div>
       </div>
       <div className="flex items-center gap-1">
-        <Button size="icon" variant="ghost" onClick={() => onMoveUp(index)}>
+        <Button 
+          size="icon" 
+          variant="ghost" 
+          onClick={() => onMoveUp(index)}
+          className="text-purple-300 hover:text-purple-200 hover:bg-purple-500/20 transition-colors"
+        >
           <ArrowUp className="h-4 w-4" />
         </Button>
-        <Button size="icon" variant="ghost" onClick={() => onMoveDown(index)}>
+        <Button 
+          size="icon" 
+          variant="ghost" 
+          onClick={() => onMoveDown(index)}
+          className="text-purple-300 hover:text-purple-200 hover:bg-purple-500/20 transition-colors"
+        >
           <ArrowDown className="h-4 w-4" />
         </Button>
-        <Button size="icon" variant="ghost" onClick={() => onRemove(index)}>
+        <Button 
+          size="icon" 
+          variant="ghost" 
+          onClick={() => onRemove(index)}
+          className="text-purple-300 hover:text-red-300 hover:bg-red-500/20 transition-colors"
+        >
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -360,6 +375,7 @@ export default function PlaylistBuilderPage() {
   const [publishedId, setPublishedId] = useState<string | null>(null);
   const [results, setResults] = useState<PlaylistItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isShuffling, setIsShuffling] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [editMode, setEditMode] = useState<string | null>(null);
@@ -432,6 +448,131 @@ export default function PlaylistBuilderPage() {
   useEffect(() => {
     setCoverCss(computeCoverGradient(playlist));
   }, [playlist]);
+
+  // ChatGPT-powered intelligent shuffle function
+  const handleShuffle = async () => {
+    const timestamp = Date.now();
+    console.log(`🔀 Starting fresh ChatGPT-powered shuffle [${timestamp}]...`);
+    setIsShuffling(true);
+    
+    // Clear existing results immediately to show it's working
+    setResults([]);
+    
+    try {
+      console.log(`📊 Current playlist: ${playlist.length} items`);
+      console.log(`🎯 Playlist items:`, playlist.map(p => p.title).join(", "));
+      
+      // Call the new ChatGPT-powered shuffle endpoint with cache-busting
+      const response = await fetch(`${process.env.NEXT_PUBLIC_TUBI_API_URL || "http://localhost:3000"}/api/shuffle?t=${timestamp}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        body: JSON.stringify({
+          playlist: playlist.map(item => ({
+            id: item.id,
+            title: item.title,
+            year: item.year,
+            genres: item.genres,
+            mood: item.mood,
+            type: item.type
+          })),
+          timestamp
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Shuffle API failed: ${response.status} ${response.statusText}`);
+      }
+
+      const shuffleResult = await response.json();
+      console.log(`🤖 ChatGPT shuffle result [${timestamp}]:`, shuffleResult);
+
+      if (shuffleResult && shuffleResult.contents && shuffleResult.contents.length > 0) {
+        // Convert Tubi content to playlist items
+        const recommendedItems = shuffleResult.contents.map(tubiToPlaylistItem);
+        
+        // Filter out items already in playlist (double-check)
+        const uniqueItems = recommendedItems.filter(item => 
+          !playlist.some(playlistItem => playlistItem.id === item.id)
+        );
+        
+        // Force UI update by clearing first, then setting
+        setResults([]);
+        setTimeout(() => {
+          setResults(uniqueItems);
+        }, 50);
+        
+        console.log(`✅ Fresh shuffle complete [${timestamp}]:`);
+        console.log(`   • Total recommendations: ${uniqueItems.length}`);
+        console.log(`   • Strategy: ${shuffleResult.strategy || 'unknown'}`);
+        console.log(`   • Playlist-based: ${shuffleResult.playlistBased || 0}`);
+        console.log(`   • Popular-based: ${shuffleResult.popularBased || 0}`);
+        console.log(`   • Server timestamp: ${shuffleResult.timestamp || 'none'}`);
+        
+        // Show feedback based on strategy
+        if (shuffleResult.strategy === 'chatgpt_intelligent') {
+          console.log(`🎯 Used ChatGPT intelligent analysis`);
+        } else if (shuffleResult.strategy === 'fallback') {
+          console.log(`🔄 Used enhanced fallback strategy`);
+        } else if (shuffleResult.strategy === 'popular_only') {
+          console.log(`📺 Used diverse popular recommendations`);
+        }
+        
+      } else {
+        console.warn("⚠️ No recommendations received from shuffle API");
+        throw new Error("No recommendations received");
+      }
+
+    } catch (error) {
+      console.error(`❌ ChatGPT shuffle failed [${timestamp}], using local fallback:`, error);
+      
+      // Enhanced local fallback with multiple random queries
+      try {
+        const fallbackQueries = [
+          "popular movies", "trending movies", "action movies", "comedy films",
+          "drama movies", "thriller movies", "horror films", "sci-fi movies",
+          "romance movies", "adventure films", "mystery movies", "indie movies"
+        ];
+        
+        // Pick 2-3 random queries for variety
+        const selectedQueries = fallbackQueries
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 2 + Math.floor(Math.random() * 2));
+          
+        console.log(`🆘 Using enhanced local fallback with queries: ${selectedQueries.join(", ")}`);
+        
+        const allFallbackItems: PlaylistItem[] = [];
+        
+        for (const query of selectedQueries) {
+          const fallbackResponse = await searchTubiContent(query, 15);
+          if (fallbackResponse && fallbackResponse.contents.length > 0) {
+            const fallbackItems = fallbackResponse.contents.map(tubiToPlaylistItem);
+            allFallbackItems.push(...fallbackItems);
+          }
+        }
+        
+        // Remove duplicates and shuffle
+        const uniqueFallback = allFallbackItems
+          .filter((item, index, self) => index === self.findIndex(t => t.id === item.id))
+          .filter(item => !playlist.some(playlistItem => playlistItem.id === item.id))
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 30);
+          
+        setResults(uniqueFallback);
+        console.log(`✅ Enhanced local fallback provided ${uniqueFallback.length} unique items`);
+        
+      } catch (fallbackError) {
+        console.error("❌ Enhanced local fallback search failed:", fallbackError);
+        // If everything fails, keep existing results
+      }
+    } finally {
+      setIsShuffling(false);
+    }
+  };
 
   // Check for edit mode and load playlist data
   useEffect(() => {
@@ -646,19 +787,40 @@ export default function PlaylistBuilderPage() {
           <h2 className="text-lg font-bold font-tubi text-white">
             {query.trim() ? `Search Results` : `Popular Content`}
           </h2>
-          <div className="text-sm text-white/70 font-inter">
-            {isSearching ? "Searching..." : `${results.length} titles`}
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-white/70 font-inter">
+              {isSearching || isShuffling ? (isShuffling ? "Shuffling..." : "Searching...") : `${results.length} titles`}
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleShuffle}
+              disabled={isSearching || isShuffling}
+              className="text-purple-300 hover:text-purple-200 hover:bg-purple-500/20 transition-colors gap-1"
+              title={playlist.length > 0 ? `🤖 ChatGPT analyzes your playlist to suggest 10 similar titles + 20 diverse popular recommendations` : `🤖 Get 30 ChatGPT-curated popular titles to start exploring`}
+            >
+              <Shuffle className="h-4 w-4" />
+              <span className="hidden sm:inline">🤖 Smart Shuffle</span>
+            </Button>
           </div>
         </div>
         
-        {isSearching && (
+        {(isSearching || isShuffling) && (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-            <p className="text-white/70 mt-4 font-inter">Searching Tubi catalog...</p>
+            <p className="text-white/70 mt-4 font-inter">
+              {isShuffling ? (
+                playlist.length > 0 
+                  ? "🤖 Analyzing your playlist for smart recommendations..." 
+                  : "🤖 Getting fresh curated recommendations..."
+              ) : (
+                "Searching Tubi catalog..."
+              )}
+            </p>
           </div>
         )}
         
-        {!isSearching && results.length === 0 && (
+        {!isSearching && !isShuffling && results.length === 0 && (
           <div className="text-center py-12">
             <p className="text-white/70 font-inter">
               {query.trim() ? "No results found. Try a different search." : "Loading content..."}
@@ -666,7 +828,7 @@ export default function PlaylistBuilderPage() {
           </div>
         )}
         
-        {!isSearching && results.length > 0 && (
+        {!isSearching && !isShuffling && results.length > 0 && (
           <motion.div layout className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {results.map((item) => (
               <ResultTile key={item.id} item={item} onAdd={onAdd} disabled={playlist.some((p) => p.id === item.id) || playlist.length >= 25} />
