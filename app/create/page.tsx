@@ -2,14 +2,22 @@
 
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, X, ArrowUp, ArrowDown, Sparkles, Save } from "lucide-react";
+import { Plus, Search, X, ArrowUp, ArrowDown, Sparkles, Save, Share2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { v4 as uuidv4 } from "uuid";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { searchTubiContent, TubiContent, getBestThumbnail, getTubiDeepLink } from "@/lib/tubi-api";
 
 // Normalized content type for playlist items
@@ -128,7 +136,7 @@ function tubiToPlaylistItem(content: TubiContent): PlaylistItem {
 }
 
 // Save to localStorage for hackathon demo
-function savePlaylist({ id, title, description, items, coverCss }: any) {
+function savePlaylist({ id, title, description, items, coverCss, votes = 0, isEdit = false }: any) {
   const key = "tubi_playlists";
   const existing = JSON.parse(localStorage.getItem(key) || "[]");
   
@@ -145,10 +153,21 @@ function savePlaylist({ id, title, description, items, coverCss }: any) {
     items,
     coverCss,
     thumbnails,
-    votes: 0,
+    votes,
     createdAt: new Date().toISOString(),
   };
-  localStorage.setItem(key, JSON.stringify([entry, ...existing]));
+  
+  if (isEdit) {
+    // Update existing playlist
+    const updatedPlaylists = existing.map((p: any) => 
+      p.id === id ? { ...entry, createdAt: p.createdAt } : p
+    );
+    localStorage.setItem(key, JSON.stringify(updatedPlaylists));
+  } else {
+    // Create new playlist
+    localStorage.setItem(key, JSON.stringify([entry, ...existing]));
+  }
+  
   return entry;
 }
 
@@ -332,6 +351,7 @@ function PlaylistItem({ item, index, onRemove, onMoveUp, onMoveDown }: any) {
 }
 
 export default function PlaylistBuilderPage() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
   const [title, setTitle] = useState("");
@@ -341,6 +361,9 @@ export default function PlaylistBuilderPage() {
   const [results, setResults] = useState<PlaylistItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [editMode, setEditMode] = useState<string | null>(null);
+  const [originalVotes, setOriginalVotes] = useState(0);
 
   // Load initial popular content on mount
   useEffect(() => {
@@ -410,9 +433,39 @@ export default function PlaylistBuilderPage() {
     setCoverCss(computeCoverGradient(playlist));
   }, [playlist]);
 
+  // Check for edit mode and load playlist data
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const editId = urlParams.get('edit');
+    
+    if (editId) {
+      setEditMode(editId);
+      
+      // Load playlist data from localStorage
+      const key = "tubi_playlists";
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        try {
+          const savedPlaylists = JSON.parse(stored);
+          const playlistToEdit = savedPlaylists.find((p: any) => p.id === editId);
+          
+          if (playlistToEdit) {
+            setTitle(playlistToEdit.title || "");
+            setDescription(playlistToEdit.description || "");
+            setPlaylist(playlistToEdit.items || []);
+            setOriginalVotes(playlistToEdit.votes || 0);
+            console.log("📝 Loaded playlist for editing:", playlistToEdit.title);
+          }
+        } catch (e) {
+          console.error("Failed to load playlist for editing:", e);
+        }
+      }
+    }
+  }, []);
+
   const onAdd = (item: any) => {
     if (playlist.some((p) => p.id === item.id)) return;
-    setPlaylist((p) => [...p, item].slice(0, 10));
+    setPlaylist((p) => [...p, item].slice(0, 25));
   };
   const onRemove = (idx: number) => setPlaylist((p) => p.filter((_, i) => i !== idx));
   const onMoveUp = (idx: number) =>
@@ -433,14 +486,53 @@ export default function PlaylistBuilderPage() {
   const handleSuggestTitle = () => setTitle((t) => (t && Math.random() < 0.35 ? t : suggestTitleFrom(playlist)));
 
   const handlePublish = () => {
-    if (playlist.length < 5) {
-      alert("Add at least 5 titles to publish your playlist.");
+    if (playlist.length < 10) {
+      alert("Add at least 10 titles to publish your playlist.");
       return;
     }
-    const id = uuidv4();
-    const entry = savePlaylist({ id, title: title || suggestTitleFrom(playlist), description, items: playlist, coverCss });
-    setPublishedId(entry.id);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    
+    const finalTitle = title || suggestTitleFrom(playlist);
+    
+    if (editMode) {
+      // Update existing playlist
+      const entry = savePlaylist({ 
+        id: editMode, 
+        title: finalTitle, 
+        description, 
+        items: playlist, 
+        coverCss,
+        votes: originalVotes,
+        isEdit: true
+      });
+      setPublishedId(entry.id);
+    } else {
+      // Create new playlist
+      const id = uuidv4();
+      const entry = savePlaylist({ id, title: finalTitle, description, items: playlist, coverCss });
+      setPublishedId(entry.id);
+    }
+    
+    setTitle(finalTitle); // Ensure title is set for the modal
+    setShowSuccessModal(true);
+  };
+
+  const handleShare = () => {
+    if (publishedId) {
+      const shareUrl = `${window.location.origin}/?modal=${publishedId}`;
+      navigator.clipboard.writeText(shareUrl);
+      // You could add a toast notification here if you have a toast system
+      alert("Share link copied to clipboard!");
+    }
+  };
+
+  const handleViewInGallery = () => {
+    setShowSuccessModal(false);
+    if (publishedId) {
+      // Navigate to gallery with modal parameter to open the specific playlist
+      router.push(`/?modal=${publishedId}`);
+    } else {
+      router.push("/");
+    }
   };
 
   return (
@@ -468,7 +560,7 @@ export default function PlaylistBuilderPage() {
         <Card className="col-span-2 bg-white/5 border-white/10 overflow-hidden">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
-              <Sparkles className="h-5 w-5" /> Build Your Playlist
+              <Sparkles className="h-5 w-5" /> {editMode ? "Edit Your Playlist" : "Build Your Playlist"}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -504,21 +596,13 @@ export default function PlaylistBuilderPage() {
                   className="bg-white/10 border-white/10 text-white placeholder:text-white/60"
                 />
                 <div className="flex items-center justify-between pt-2">
-                  <div className="text-sm text-white/70 font-inter">Add 5–10 titles • Click + to add • Use arrows to reorder</div>
+                  <div className="text-sm text-white/70 font-inter">Add 10–25 titles • Click + to add • Use arrows to reorder</div>
                   <div className="flex items-center gap-2">
                     <Button variant="secondary" onClick={handlePublish}>
-                      <Save className="h-4 w-4 mr-1" /> Publish
+                      <Save className="h-4 w-4 mr-1" /> {editMode ? "Update" : "Publish"}
                     </Button>
                   </div>
                 </div>
-                {publishedId && (
-                  <div className="text-emerald-300 text-sm font-inter">
-                    Published! Your playlist is saved locally for the demo.{" "}
-                    <Link href="/" className="underline">
-                      View Gallery
-                    </Link>
-                  </div>
-                )}
               </div>
             </div>
           </CardContent>
@@ -527,7 +611,7 @@ export default function PlaylistBuilderPage() {
         {/* Your Playlist Panel */}
         <Card className="bg-white/5 border-white/10">
           <CardHeader>
-            <CardTitle className="text-white">Your Playlist ({playlist.length}/10)</CardTitle>
+            <CardTitle className="text-white">Your Playlist ({playlist.length}/25)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {playlist.length === 0 && (
@@ -585,7 +669,7 @@ export default function PlaylistBuilderPage() {
         {!isSearching && results.length > 0 && (
           <motion.div layout className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {results.map((item) => (
-              <ResultTile key={item.id} item={item} onAdd={onAdd} disabled={playlist.some((p) => p.id === item.id) || playlist.length >= 10} />
+              <ResultTile key={item.id} item={item} onAdd={onAdd} disabled={playlist.some((p) => p.id === item.id) || playlist.length >= 25} />
             ))}
           </motion.div>
         )}
@@ -598,6 +682,63 @@ export default function PlaylistBuilderPage() {
           🎬 Powered by Tubi • Real content from the Tubi catalog
         </div>
       </div>
+
+      {/* Success Modal */}
+      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <DialogContent 
+          className="sm:max-w-md text-white border-purple-500/30"
+          style={{
+            background: "linear-gradient(15deg, #45009D 0%, #8C00E5 100%)",
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center font-tubi text-white">
+              {editMode ? "Playlist Updated!" : "Congrats! You made a Tubi playlist"}
+            </DialogTitle>
+            <DialogDescription className="text-center text-base text-white/80 font-inter">
+              {editMode ? "Your playlist has been updated." : "View in Gallery and Share with Your friends."}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex flex-col items-center gap-6 py-4">
+            {/* Cover Art Preview */}
+            <div 
+              className="w-48 h-48 rounded-lg flex items-center justify-center text-white text-6xl font-bold shadow-lg font-tubi-black overflow-hidden"
+              style={{ background: coverCss }}
+            >
+              {playlist.length > 0 ? (
+                <CollagePreview playlist={playlist} coverCss={coverCss} />
+              ) : (
+                title.charAt(0).toUpperCase()
+              )}
+            </div>
+            
+            {/* Playlist Title */}
+            <h3 className="text-xl font-semibold text-center font-tubi text-white">{title}</h3>
+            
+            {/* Action Buttons */}
+            <div className="flex flex-col w-full gap-3">
+              <Button 
+                onClick={handleViewInGallery}
+                size="lg"
+                className="w-full gap-2 shadow-lg transition-all hover:shadow-xl bg-[#FFFF13] hover:bg-[#FFFF13]/85 active:bg-[#FFFF13]/70 text-black font-bold"
+              >
+                <ExternalLink className="h-5 w-5" />
+                View in Gallery
+              </Button>
+              
+              <Button 
+                onClick={handleShare}
+                size="lg"
+                className="w-full gap-2 shadow-lg transition-all hover:shadow-xl bg-[#FFFF13] hover:bg-[#FFFF13]/85 active:bg-[#FFFF13]/70 text-black font-bold"
+              >
+                <Share2 className="h-5 w-5" />
+                Share Link
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

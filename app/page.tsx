@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, TrendingUp, Clock, ArrowUp } from "lucide-react";
+import { Plus, Search, TrendingUp, Clock, ArrowUp, Edit2, Trash2, Share2, Check } from "lucide-react";
 import PlaylistCard from "@/components/PlaylistCard";
 import Header from "@/components/Header";
-import { getTubiDeepLink } from "@/lib/tubi-api";
+import { getTubiDeepLink, searchTubiContent, getBestThumbnail } from "@/lib/tubi-api";
 import {
   Dialog,
   DialogContent,
@@ -39,136 +39,258 @@ interface Playlist {
   coverCss?: string;
 }
 
-// Mock data for initial display
-const mockPlaylists: Playlist[] = [
+// Function to generate mock playlists with real Tubi content
+async function generateMockPlaylistsWithTubiContent(): Promise<Playlist[]> {
+  const playlistTemplates = [
+    {
+      title: "Action & Adventure Collection",
+      creator: "ActionFan",
+      description: "High-octane thrills and epic adventures that will keep you on the edge of your seat.",
+      coverColor: "#DC2626",
+      searchTerms: ["action", "adventure"],
+      votes: 234,
+      createdAt: new Date("2024-01-15"),
+    },
+    {
+      title: "Comedy Central",
+      creator: "LaughTrack",
+      description: "Hilarious comedies and feel-good movies to brighten your day.",
+      coverColor: "#F59E0B",
+      searchTerms: ["comedy", "funny"],
+      votes: 189,
+      createdAt: new Date("2024-01-20"),
+    },
+    {
+      title: "Drama Masterpieces",
+      creator: "DramaQueen",
+      description: "Powerful stories and unforgettable performances that touch the heart.",
+      coverColor: "#10B981",
+      searchTerms: ["drama", "family"],
+      votes: 156,
+      createdAt: new Date("2024-01-10"),
+    },
+    {
+      title: "Sci-Fi & Fantasy",
+      creator: "MovieBuff2024",
+      description: "Mind-bending sci-fi and magical fantasy adventures from other worlds.",
+      coverColor: "#8B5CF6",
+      searchTerms: ["sci-fi", "fantasy"],
+      votes: 142,
+      createdAt: new Date("2024-01-25"),
+    },
+    {
+      title: "Horror & Thrillers",
+      creator: "ScreamQueen",
+      description: "Spine-chilling horror and edge-of-your-seat thrillers for the brave.",
+      coverColor: "#EF4444",
+      searchTerms: ["horror", "thriller"],
+      votes: 128,
+      createdAt: new Date("2024-01-18"),
+    },
+    {
+      title: "True Stories",
+      creator: "DocumentaryLover",
+      description: "Real stories, documentaries, and biopics that inspire and educate.",
+      coverColor: "#3B82F6",
+      searchTerms: ["documentary", "biography"],
+      votes: 95,
+      createdAt: new Date("2024-01-22"),
+    },
+  ];
+
+  const mockPlaylists: Playlist[] = [];
+
+  for (const template of playlistTemplates) {
+    try {
+      // Search for content using random search terms
+      const searchTerm = template.searchTerms[Math.floor(Math.random() * template.searchTerms.length)];
+      const searchResults = await searchTubiContent(searchTerm, 8);
+      
+      if (searchResults && searchResults.contents && searchResults.contents.length > 0) {
+        // Convert Tubi content to playlist items
+        const items: PlaylistItem[] = searchResults.contents.slice(0, 6).map(content => ({
+          id: content.id,
+          title: content.title,
+          thumbnail: getBestThumbnail(content) || undefined,
+          year: content.year?.toString(),
+          type: content.type === "s" ? "series" : "movie",
+          genres: content.tags?.slice(0, 2) || [],
+        }));
+
+        // Generate thumbnails array for the playlist
+        const thumbnails = items
+          .filter(item => item.thumbnail)
+          .slice(0, 4)
+          .map(item => item.thumbnail!);
+
+        const playlist: Playlist = {
+          id: (mockPlaylists.length + 1).toString(),
+          title: template.title,
+          creator: template.creator,
+          description: template.description,
+          itemCount: items.length,
+          votes: Math.floor(template.votes + Math.random() * 50 - 25), // Add some randomness
+          coverColor: template.coverColor,
+          thumbnails,
+          createdAt: template.createdAt,
+          items,
+        };
+
+        mockPlaylists.push(playlist);
+        console.log(`🎬 Generated playlist: ${playlist.title} with ${items.length} items`);
+      }
+    } catch (error) {
+      console.error(`Failed to generate playlist for ${template.title}:`, error);
+    }
+  }
+
+  return mockPlaylists;
+}
+
+// Fallback mock playlists in case API fails
+const fallbackMockPlaylists: Playlist[] = [
   {
     id: "1",
-    title: "Ultimate Sci-Fi Collection",
+    title: "Popular Movies",
     creator: "MovieBuff2024",
-    description: "A carefully curated collection of mind-bending sci-fi masterpieces that explore the boundaries of imagination and technology.",
+    description: "The most popular movies on Tubi right now.",
     itemCount: 12,
     votes: 234,
     coverColor: "#8B5CF6",
     thumbnails: [],
     createdAt: new Date("2024-01-15"),
-    items: [
-      { id: "1", title: "Interstellar Journey", thumbnail: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=300&h=400&fit=crop", year: "2023", type: "movie", genres: ["Sci-Fi", "Drama"] },
-      { id: "2", title: "The Matrix Reborn", thumbnail: "https://images.unsplash.com/photo-1574267432644-f637eca6d2c4?w=300&h=400&fit=crop", year: "2022", type: "movie", genres: ["Sci-Fi", "Action"] },
-      { id: "3", title: "Blade Runner 2099", thumbnail: "https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?w=300&h=400&fit=crop", year: "2024", type: "movie", genres: ["Sci-Fi", "Thriller"] },
-      { id: "4", title: "Alien Contact", thumbnail: "https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?w=300&h=400&fit=crop", year: "2023", type: "movie", genres: ["Sci-Fi", "Horror"] },
-    ],
+    items: [],
   },
   {
     id: "2",
-    title: "Classic Action Heroes",
+    title: "Action Adventures",
     creator: "ActionFan",
-    description: "Non-stop adrenaline with legendary action heroes and explosive sequences that defined a generation.",
+    description: "High-octane action and thrilling adventures.",
     itemCount: 8,
     votes: 189,
-    coverColor: "#EC4899",
+    coverColor: "#DC2626",
     thumbnails: [],
     createdAt: new Date("2024-01-20"),
-    items: [
-      { id: "5", title: "Die Hard Legacy", thumbnail: "https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?w=300&h=400&fit=crop", year: "2021", type: "movie", genres: ["Action", "Thriller"] },
-      { id: "6", title: "The Expendables", thumbnail: "https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=300&h=400&fit=crop", year: "2020", type: "movie", genres: ["Action", "Adventure"] },
-      { id: "7", title: "Rapid Fire", thumbnail: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=300&h=400&fit=crop", year: "2022", type: "movie", genres: ["Action", "Crime"] },
-      { id: "8", title: "Maximum Force", thumbnail: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=300&h=400&fit=crop", year: "2023", type: "movie", genres: ["Action", "Drama"] },
-    ],
+    items: [],
   },
   {
     id: "3",
-    title: "Mind-Bending Thrillers",
-    creator: "CinemaLover",
-    description: "Psychological thrillers that will keep you guessing until the very end. Prepare to question everything.",
+    title: "Comedy Collection",
+    creator: "LaughTrack",
+    description: "Hilarious movies to brighten your day.",
     itemCount: 15,
     votes: 156,
-    coverColor: "#3B82F6",
-    thumbnails: [],
-    createdAt: new Date("2024-01-10"),
-    items: [
-      { id: "9", title: "Inception Dreams", thumbnail: "https://images.unsplash.com/photo-1574267432644-f637eca6d2c4?w=300&h=400&fit=crop", year: "2022", type: "movie", genres: ["Thriller", "Sci-Fi"] },
-      { id: "10", title: "Shutter Island", thumbnail: "https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?w=300&h=400&fit=crop", year: "2021", type: "movie", genres: ["Thriller", "Mystery"] },
-      { id: "11", title: "The Prestige", thumbnail: "https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=300&h=400&fit=crop", year: "2023", type: "movie", genres: ["Thriller", "Drama"] },
-    ],
-  },
-  {
-    id: "4",
-    title: "Best Drama Collection",
-    creator: "DramaQueen",
-    description: "Powerful stories that touch the heart and soul. Experience raw emotions and unforgettable performances.",
-    itemCount: 20,
-    votes: 142,
-    coverColor: "#10B981",
-    thumbnails: [],
-    createdAt: new Date("2024-01-25"),
-    items: [
-      { id: "12", title: "The Pursuit", thumbnail: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=300&h=400&fit=crop", year: "2020", type: "movie", genres: ["Drama", "Biography"] },
-      { id: "13", title: "Moonlight Stories", thumbnail: "https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=300&h=400&fit=crop", year: "2021", type: "movie", genres: ["Drama", "Romance"] },
-    ],
-  },
-  {
-    id: "5",
-    title: "Comedy Gold",
-    creator: "LaughTrack",
-    description: "Laugh until your sides hurt with these hilarious comedies that never get old.",
-    itemCount: 18,
-    votes: 128,
     coverColor: "#F59E0B",
     thumbnails: [],
-    createdAt: new Date("2024-01-18"),
-    items: [
-      { id: "14", title: "Super Troopers", thumbnail: "https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?w=300&h=400&fit=crop", year: "2019", type: "movie", genres: ["Comedy", "Crime"] },
-      { id: "15", title: "The Hangover", thumbnail: "https://images.unsplash.com/photo-1574267432644-f637eca6d2c4?w=300&h=400&fit=crop", year: "2020", type: "movie", genres: ["Comedy", "Adventure"] },
-    ],
-  },
-  {
-    id: "6",
-    title: "Horror Marathon",
-    creator: "ScreamQueen",
-    description: "Terrifying tales that will haunt your dreams. Perfect for a spine-chilling movie night.",
-    itemCount: 10,
-    votes: 95,
-    coverColor: "#EF4444",
-    thumbnails: [],
-    createdAt: new Date("2024-01-22"),
-    items: [
-      { id: "16", title: "The Conjuring", thumbnail: "https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=300&h=400&fit=crop", year: "2021", type: "movie", genres: ["Horror", "Thriller"] },
-      { id: "17", title: "A Quiet Place", thumbnail: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=300&h=400&fit=crop", year: "2022", type: "movie", genres: ["Horror", "Drama"] },
-    ],
+    createdAt: new Date("2024-01-10"),
+    items: [],
   },
 ];
 
 const Index = () => {
-  const [playlists, setPlaylists] = useState<Playlist[]>(mockPlaylists);
+  const [playlists, setPlaylists] = useState<Playlist[]>(fallbackMockPlaylists);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"votes" | "recent">("votes");
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
+  const [shareSuccess, setShareSuccess] = useState(false);
+  const [isLoadingPlaylists, setIsLoadingPlaylists] = useState(true);
 
-  // Load playlists from localStorage on mount
+  // Load playlists from localStorage and generate mock playlists with real Tubi content
   useEffect(() => {
-    const key = "tubi_playlists";
-    const stored = localStorage.getItem(key);
-    if (stored) {
+    const loadPlaylistsWithRealContent = async () => {
       try {
-        const savedPlaylists = JSON.parse(stored);
-        const formatted = savedPlaylists.map((p: any) => ({
-          id: p.id,
-          title: p.title,
-          creator: "You",
-          description: p.description || "Created with Tubi Playlist Builder",
-          itemCount: p.items?.length || 0,
-          votes: p.votes || 0,
-          coverColor: extractColorFromGradient(p.coverCss) || "#8B5CF6",
-          thumbnails: p.thumbnails || [],
-          createdAt: new Date(p.createdAt),
-          items: p.items || [],
-          coverCss: p.coverCss,
-        }));
-        setPlaylists([...formatted, ...mockPlaylists]);
-      } catch (e) {
-        console.error("Failed to load playlists:", e);
+        setIsLoadingPlaylists(true);
+        console.log("🎬 Loading playlists with real Tubi content...");
+        
+        // Generate mock playlists with real Tubi content
+        const realContentPlaylists = await generateMockPlaylistsWithTubiContent();
+        
+        // Load user-created playlists from localStorage
+        const key = "tubi_playlists";
+        const stored = localStorage.getItem(key);
+        let userPlaylists: Playlist[] = [];
+        
+        if (stored) {
+          try {
+            const savedPlaylists = JSON.parse(stored);
+            userPlaylists = savedPlaylists.map((p: any) => ({
+              id: p.id,
+              title: p.title,
+              creator: "You",
+              description: p.description || "Created with Tubi Playlist Builder",
+              itemCount: p.items?.length || 0,
+              votes: p.votes || 0,
+              coverColor: extractColorFromGradient(p.coverCss) || "#8B5CF6",
+              thumbnails: p.thumbnails || [],
+              createdAt: new Date(p.createdAt),
+              items: p.items || [],
+              coverCss: p.coverCss,
+            }));
+          } catch (e) {
+            console.error("Failed to load user playlists:", e);
+          }
+        }
+        
+        // Combine user playlists with generated mock playlists
+        const allPlaylists = [...userPlaylists, ...realContentPlaylists];
+        
+        // Use fallback if no real content was generated
+        if (realContentPlaylists.length === 0) {
+          console.warn("⚠️ Failed to generate playlists with real content, using fallback");
+          allPlaylists.push(...fallbackMockPlaylists);
+        }
+        
+        setPlaylists(allPlaylists);
+        console.log(`✅ Loaded ${allPlaylists.length} playlists (${userPlaylists.length} user, ${realContentPlaylists.length} generated)`);
+        
+        // Check for modal parameter in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const modalPlaylistId = urlParams.get('modal');
+        if (modalPlaylistId) {
+          const playlist = allPlaylists.find(p => p.id === modalPlaylistId);
+          if (playlist) {
+            setSelectedPlaylist(playlist);
+          }
+          // Clean up URL without reloading
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        
+      } catch (error) {
+        console.error("Failed to load playlists:", error);
+        // Use fallback playlists with some user playlists if they exist
+        const key = "tubi_playlists";
+        const stored = localStorage.getItem(key);
+        let fallbackPlaylists = [...fallbackMockPlaylists];
+        
+        if (stored) {
+          try {
+            const savedPlaylists = JSON.parse(stored);
+            const userPlaylists = savedPlaylists.map((p: any) => ({
+              id: p.id,
+              title: p.title,
+              creator: "You",
+              description: p.description || "Created with Tubi Playlist Builder",
+              itemCount: p.items?.length || 0,
+              votes: p.votes || 0,
+              coverColor: extractColorFromGradient(p.coverCss) || "#8B5CF6",
+              thumbnails: p.thumbnails || [],
+              createdAt: new Date(p.createdAt),
+              items: p.items || [],
+              coverCss: p.coverCss,
+            }));
+            fallbackPlaylists = [...userPlaylists, ...fallbackMockPlaylists];
+          } catch (e) {
+            console.error("Failed to load user playlists:", e);
+          }
+        }
+        
+        setPlaylists(fallbackPlaylists);
+      } finally {
+        setIsLoadingPlaylists(false);
       }
-    }
+    };
+
+    loadPlaylistsWithRealContent();
   }, []);
 
   const handleVote = (id: string) => {
@@ -201,6 +323,54 @@ const Index = () => {
     const playlist = playlists.find(p => p.id === id);
     if (playlist) {
       setSelectedPlaylist(playlist);
+    }
+  };
+
+  // Check if current user owns the playlist
+  const isOwner = (playlist: Playlist) => {
+    return playlist.creator === "You";
+  };
+
+  const handleEditPlaylist = (playlist: Playlist) => {
+    // Navigate to create page with edit parameter
+    window.location.href = `/create?edit=${playlist.id}`;
+  };
+
+  const handleDeletePlaylist = (playlist: Playlist) => {
+    // Single click with native confirmation dialog
+    if (window.confirm(`Are you sure you want to delete "${playlist.title}"? This action cannot be undone.`)) {
+      // Perform actual deletion
+      const updatedPlaylists = playlists.filter(p => p.id !== playlist.id);
+      setPlaylists(updatedPlaylists);
+      
+      // Update localStorage
+      const key = "tubi_playlists";
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        try {
+          const savedPlaylists = JSON.parse(stored);
+          const filtered = savedPlaylists.filter((p: any) => p.id !== playlist.id);
+          localStorage.setItem(key, JSON.stringify(filtered));
+        } catch (e) {
+          console.error("Failed to delete playlist:", e);
+        }
+      }
+      
+      setSelectedPlaylist(null);
+    }
+  };
+
+  const handleSharePlaylist = async (playlist: Playlist) => {
+    const shareUrl = `${window.location.origin}/?modal=${playlist.id}`;
+    
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareSuccess(true);
+      setTimeout(() => setShareSuccess(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy to clipboard:", error);
+      // Fallback to alert
+      alert(`Share this playlist: ${shareUrl}`);
     }
   };
 
@@ -267,17 +437,23 @@ const Index = () => {
           </div>
           <div className="flex gap-2">
             <Button
-              variant={sortBy === "votes" ? "default" : "playlist"}
               onClick={() => setSortBy("votes")}
-              className="gap-2"
+              className={`gap-2 transition-all ${
+                sortBy === "votes" 
+                  ? "bg-white text-black hover:bg-white/90" 
+                  : "bg-[#2a0146] text-white hover:bg-[#3a0656] border border-white/20"
+              }`}
             >
               <TrendingUp className="w-4 h-4" />
               Top Voted
             </Button>
             <Button
-              variant={sortBy === "recent" ? "default" : "playlist"}
               onClick={() => setSortBy("recent")}
-              className="gap-2"
+              className={`gap-2 transition-all ${
+                sortBy === "recent" 
+                  ? "bg-white text-black hover:bg-white/90" 
+                  : "bg-[#2a0146] text-white hover:bg-[#3a0656] border border-white/20"
+              }`}
             >
               <Clock className="w-4 h-4" />
               Recent
@@ -286,22 +462,34 @@ const Index = () => {
         </div>
 
         {/* Playlists Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPlaylists.map((playlist) => (
-            <PlaylistCard
-              key={playlist.id}
-              playlist={playlist}
-              onVote={handleVote}
-              onClick={handlePlaylistClick}
-            />
-          ))}
-        </div>
-
-        {filteredPlaylists.length === 0 && (
+        {isLoadingPlaylists ? (
           <div className="text-center py-20">
-            <p className="text-xl text-white/70 font-inter">No playlists found</p>
-            <p className="text-sm text-white/60 mt-2 font-inter">Try a different search term</p>
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+              <p className="text-xl text-white/70 font-inter">Loading playlists with real Tubi content...</p>
+            </div>
+            <p className="text-sm text-white/60 font-inter">Fetching the latest movies and shows for you</p>
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredPlaylists.map((playlist) => (
+                <PlaylistCard
+                  key={playlist.id}
+                  playlist={playlist}
+                  onVote={handleVote}
+                  onClick={handlePlaylistClick}
+                />
+              ))}
+            </div>
+
+            {filteredPlaylists.length === 0 && !isLoadingPlaylists && (
+              <div className="text-center py-20">
+                <p className="text-xl text-white/70 font-inter">No playlists found</p>
+                <p className="text-sm text-white/60 mt-2 font-inter">Try a different search term</p>
+              </div>
+            )}
+          </>
         )}
       </main>
 
@@ -324,17 +512,78 @@ const Index = () => {
                   <p className="text-sm text-white/60 font-inter">
                     Created by {selectedPlaylist.creator} • {selectedPlaylist.itemCount} items
                   </p>
-                  <Button
-                    size="sm"
-                    className="gap-1 shadow-lg transition-all hover:shadow-xl bg-[#FFFF13] hover:bg-[#FFFF13]/85 active:bg-[#FFFF13]/70 text-black font-bold"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleVote(selectedPlaylist.id);
-                    }}
-                  >
-                    <ArrowUp className="w-4 h-4" />
-                    {selectedPlaylist.votes}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {/* Action Icons */}
+                    <div className="flex items-center gap-1">
+                      {isOwner(selectedPlaylist) ? (
+                        <>
+                          {/* Edit Button */}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditPlaylist(selectedPlaylist);
+                            }}
+                            aria-label="Edit playlist"
+                            title="Edit playlist"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                          
+                          {/* Delete Button */}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-white/60 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePlaylist(selectedPlaylist);
+                            }}
+                            aria-label="Delete playlist"
+                            title="Delete playlist"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      ) : null}
+                      
+                      {/* Share Button */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-white/60 hover:text-white hover:bg-white/10 transition-colors relative"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSharePlaylist(selectedPlaylist);
+                        }}
+                        aria-label="Share playlist"
+                        title="Share playlist"
+                      >
+                        {shareSuccess ? (
+                          <Check className="w-4 h-4 text-green-400" />
+                        ) : (
+                          <Share2 className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                    
+                    {/* Vote Button */}
+                    <Button
+                      size="sm"
+                      className="gap-1 shadow-lg transition-all hover:shadow-xl bg-[#FFFF13] hover:bg-[#FFFF13]/85 active:bg-[#FFFF13]/70 text-black font-bold ml-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleVote(selectedPlaylist.id);
+                      }}
+                      aria-label={`Vote for ${selectedPlaylist.title}`}
+                      title={`Vote for ${selectedPlaylist.title}`}
+                    >
+                      <ArrowUp className="w-4 h-4" />
+                      {selectedPlaylist.votes}
+                    </Button>
+                  </div>
                 </div>
               </DialogHeader>
               
